@@ -178,8 +178,8 @@ function openSwap(){
     <p class="muted" style="font-size:14px">As duas famílias trocam de ano entre si. É a única forma de uma família ir fora da ordem.</p>
     <div class="form">
       <div id="swErr" class="err hidden"></div>
-      <label class="field"><span>Réveillon<span class="req">*</span></span><select id="swA">${opt(cy)}</select></label>
-      <label class="field"><span>Troca com o Réveillon<span class="req">*</span></span><select id="swB">${opt(cy+1)}</select></label>
+      <label class="field"><span>Réveillon</span><select id="swA">${opt(cy)}</select></label>
+      <label class="field"><span>Troca com o Réveillon</span><select id="swB">${opt(cy+1)}</select></label>
       <div class="hol-note" id="swPrev"></div>
       <button class="btn full" id="swSave">${ic("check",18,2.2)}Registrar troca</button>
     </div>`);
@@ -659,21 +659,20 @@ function openDetail(id){
 
 /* ---------- nova reserva / editar ---------- */
 function openBooking(b=null,startDay=null){
-  const data=b?{...b}:{familyId:"",responsible:"",notes:"",checkIn:startDay||today(),checkOut:addDays(startDay||today(),2)};
+  const data=b?{...b}:{familyId:"",responsible:"",notes:"",checkIn:startDay||"",checkOut:""};
   const rate=b?b.rate:S.config.dailyRate;
   openSheet(`${sheetHead(b?"Editar reserva":"Nova reserva")}
     <div class="form">
-      <p class="req-note"><span class="req">*</span> Campos obrigatórios</p>
       <div id="bkErr" class="err hidden"></div>
-      <div class="field" id="fFam"><span>Família<span class="req" aria-hidden="true">*</span></span>
+      <div class="field" id="fFam"><span>Família</span>
         <div class="fam-pick">${S.config.families.map(f=>`<button type="button" style="--fc:${f.color}" data-fam="${f.id}" class="${data.familyId===f.id?"on":""}"><i class="dot"></i><span>${esc(f.name)}</span></button>`).join("")}</div>
         <div class="quota hidden" id="bkQuota"></div></div>
-      <div class="row2">
-        <label class="field" id="fIn"><span>Entrada<span class="req" aria-hidden="true">*</span></span><input type="date" id="bkIn" value="${data.checkIn}" required aria-required="true"></label>
-        <label class="field" id="fOut"><span>Saída<span class="req" aria-hidden="true">*</span></span><input type="date" id="bkOut" value="${data.checkOut}" required aria-required="true"></label>
+      <div class="field" id="fPeriod"><span>Período</span>
+        <input type="hidden" id="bkIn" value="${data.checkIn}"><input type="hidden" id="bkOut" value="${data.checkOut}">
+        <div class="rp" id="rp"></div>
       </div>
       <small class="muted" id="bkLenHint" style="margin-top:-8px"></small>
-      <label class="field" id="fResp"><span>Responsável<span class="req" aria-hidden="true">*</span></span><select id="bkResp" required aria-required="true"></select><small class="muted" id="bkRespHint"></small></label>
+      <label class="field" id="fResp"><span>Responsável</span><select id="bkResp" required aria-required="true"></select><small class="muted" id="bkRespHint"></small></label>
       <label class="field"><span>Observações <span style="color:var(--ink-3);font-weight:500">(opcional)</span></span><textarea id="bkNotes" rows="2" placeholder="Horário de chegada, pedidos…">${esc(data.notes)}</textarea></label>
       <div class="hol-note hidden" id="bkHol"></div>
       <div class="rule-warn hidden" id="bkRule"></div>
@@ -734,8 +733,51 @@ function openBooking(b=null,startDay=null){
     return blocked;
   };
   $$("[data-fam]").forEach(btn=>btn.onclick=()=>{famId=btn.dataset.fam;$("#fFam").classList.remove("invalid");$$("[data-fam]").forEach(x=>x.classList.toggle("on",x===btn));fill();calc()});
-  $("#bkIn").onchange=()=>{$("#fIn").classList.remove("invalid");if($("#bkIn").value&&$("#bkOut").value<=$("#bkIn").value)$("#bkOut").value=addDays($("#bkIn").value,1);calc()};
-  $("#bkOut").onchange=()=>{$("#fOut").classList.remove("invalid");calc()};
+  /* calendário do período: 1º toque = entrada, 2º toque = saída */
+  const minDay=b&&b.checkIn<today()?b.checkIn:today();
+  const busy=new Set();
+  if(!S.config.allowOverlap) S.bookings.forEach(x=>{if(b&&x.id===b.id)return;for(let d=x.checkIn;d<x.checkOut;d=addDays(d,1))busy.add(d)});
+  let rpSel={a:data.checkIn||"",b:data.checkOut||""},rpMsg="";
+  const f0=parse(rpSel.a||today());let rpM={y:f0.getFullYear(),m:f0.getMonth()};
+  const drawRP=()=>{
+    const {y,m}=rpM,first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),t=today();
+    const title=first.toLocaleDateString("pt-BR",{month:"long"});
+    let cells="";for(let i=0;i<first.getDay();i++)cells+=`<span class="rp-d out"></span>`;
+    for(let dd=1;dd<=days;dd++){
+      const s=`${y}-${pad(m+1)}-${pad(dd)}`,{a,b:z}=rpSel;
+      const cls=[s<minDay?"dis":"",busy.has(s)?"busy":"",holOn(s).length?"hol":"",s===t?"today":"",
+        a&&s===a?"start":"",z&&s===z?"end":"",a&&z&&s>a&&s<z?"in":"",a&&z?"has":""].join(" ");
+      cells+=`<button type="button" class="rp-d ${cls}" data-rp="${s}" ${s<minDay?"disabled":""} aria-label="${dmw(s)}${busy.has(s)?" · reservado":""}"><span>${dd}</span></button>`;
+    }
+    const nm=n=>n?plural(n,"diária"):"";
+    const sum=rpSel.a?`<div class="rp-sum"><div><small>Entrada</small><b>${dmw(rpSel.a)}</b></div><div><small>Saída</small><b>${rpSel.b?dmw(rpSel.b):"—"}</b></div></div>`:"";
+    const hint=rpMsg||(!rpSel.a?"Toque no dia de entrada.":!rpSel.b?"Agora toque no dia de saída.":`${nm(nights(rpSel.a,rpSel.b))} · toque em outro dia para recomeçar.`);
+    $("#rp").innerHTML=`${sum}
+      <div class="rp-head"><button type="button" class="ibtn" id="rpPrev" aria-label="Mês anterior">${ic("left",16)}</button>
+        <b>${title[0].toUpperCase()+title.slice(1)} ${y}</b>
+        <button type="button" class="ibtn" id="rpNext" aria-label="Próximo mês">${ic("right",16)}</button></div>
+      <div class="rp-dow">${SEM.map(d=>`<div>${d[0].toUpperCase()}</div>`).join("")}</div>
+      <div class="rp-grid">${cells}</div>
+      <div class="rp-hint ${rpMsg?"warn":""}">${hint}</div>
+      <div class="rp-legend"><span><i class="lg busy"></i>Já reservado</span><span><i class="lg hol"></i>Feriado</span></div>`;
+    $("#rpPrev").onclick=()=>{rpM.m--;if(rpM.m<0){rpM.m=11;rpM.y--}drawRP()};
+    $("#rpNext").onclick=()=>{rpM.m++;if(rpM.m>11){rpM.m=0;rpM.y++}drawRP()};
+    $$("[data-rp]",$("#rp")).forEach(x=>x.onclick=()=>pickRP(x.dataset.rp));
+  };
+  const pickRP=s=>{
+    rpMsg="";
+    if(!rpSel.a||rpSel.b||s<=rpSel.a){
+      if(busy.has(s)){rpMsg="Esse dia já está reservado. Escolha outro dia de entrada.";drawRP();return}
+      rpSel={a:s,b:""};
+    }else{
+      let clash=false;for(let d=rpSel.a;d<s;d=addDays(d,1))if(busy.has(d)){clash=true;break}
+      if(clash){rpMsg="O período passa por dias já reservados. Escolha uma saída antes deles.";drawRP();return}
+      rpSel.b=s;
+    }
+    $("#bkIn").value=rpSel.a;$("#bkOut").value=rpSel.b;
+    $("#fPeriod").classList.remove("invalid");drawRP();calc();
+  };
+  drawRP();
   fill();calc();
   $("#bkSave").onclick=async()=>{
     const btn=$("#bkSave");btn.disabled=true;$("#bkErr").classList.add("hidden");
@@ -745,11 +787,10 @@ function openBooking(b=null,startDay=null){
       $$(".field.invalid").forEach(x=>x.classList.remove("invalid"));
       const miss=[];
       if(!famId){miss.push("família");$("#fFam").classList.add("invalid")}
-      if(!body.checkIn){miss.push("entrada");$("#fIn").classList.add("invalid")}
-      if(!body.checkOut){miss.push("saída");$("#fOut").classList.add("invalid")}
+      if(!body.checkIn||!body.checkOut){miss.push(!body.checkIn?"período":"dia de saída");$("#fPeriod").classList.add("invalid")}
       if(!body.responsible){miss.push("responsável");$("#fResp").classList.add("invalid")}
       if(miss.length) throw new Error(`Preencha os campos obrigatórios: ${miss.join(", ")}.`);
-      if(body.checkOut<=body.checkIn){$("#fOut").classList.add("invalid");throw new Error("A saída precisa ser depois da entrada.")}
+      if(body.checkOut<=body.checkIn){$("#fPeriod").classList.add("invalid");throw new Error("A saída precisa ser depois da entrada.")}
       if(b) await api("bookings/"+b.id,{method:"PUT",body}); else await api("bookings",{method:"POST",body});
       closeSheet();toast(b?"Reserva atualizada":"Reserva confirmada");await refresh();
     }catch(e){$("#bkErr").textContent=e.message;$("#bkErr").classList.remove("hidden");$(".sheet").scrollTo({top:0,behavior:"smooth"});btn.disabled=false}
