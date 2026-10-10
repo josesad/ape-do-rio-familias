@@ -1,0 +1,14 @@
+{
+  "name": "ape-do-rio-familias",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.4",
+    "@netlify/functions": "^6.0.2"
+  },
+  "type": "module"
+}
