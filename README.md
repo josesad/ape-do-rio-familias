@@ -16,6 +16,13 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - Duração máxima: **10 diárias em tempo comum** e **6 diárias em janeiro e julho** (qualquer diária nesses meses, com ou sem feriado). Estadias com feriado fora de jan./jul. não têm esse limite. Ajustável em Ajustes.
 - A regra é verificada no servidor; o formulário mostra as vagas e avisa antes de salvar.
 
+## Réveillon (Ano Novo)
+- Sequência fixa entre as famílias (padrão: Ângela → Aloísio → Maria José → Cleia → recomeça), a partir do Réveillon 2025→2026 (Ângela).
+- Só a família da vez pode marcar uma estadia que inclua a noite de 31/12. Quem não vai, perde a vez (a sequência anda todo ano).
+- Ir fora da ordem só com **troca registrada** (admin ou editor, no quadro do Réveillon do Painel). O admin pode desfazer trocas.
+- O quadro do Réveillon (vez do ano, histórico, sequência e trocas) é visível para todos, inclusive sem login.
+- Ordem e ano de referência editáveis em Ajustes → Sequência do Réveillon.
+
 ## Acessos
 🌐 **Link público:** qualquer pessoa com o link vê painel, calendário e reservas, sem login. Valores, diária e pagamentos (aba Financeiro) só aparecem para admin e editor — o servidor nem envia esses dados para quem não está logado.
 

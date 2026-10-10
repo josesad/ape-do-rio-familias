@@ -112,6 +112,37 @@ function verify(token: string): { r: Role; h: string; exp: number } | null {
 const tokenFor = (acc: Account) => sign({ r: acc.role, h: acc.hash.slice(0, 16), exp: Date.now() + 60 * 86400000 })
 
 /* ---------- dados ---------- */
+/* ---------- Réveillon: sequência entre as famílias ----------
+   O "ano" Y é o Réveillon da noite de 31/12/Y para 01/01/(Y+1).
+   A vez segue a ordem a cada ano, a partir de um ano de referência. Quem não vai, perde a vez.
+   Só dá para ir fora da ordem registrando uma troca (as famílias trocam de ano entre si). */
+interface Swap { id: string; a: number; b: number; famA: string; famB: string; by: string; at: string }
+interface NewYear { order: string[]; anchorYear: number; anchorFamily: string; sinceYear: number; swaps: Swap[] }
+const DEFAULT_NY: NewYear = {
+  order: ["angela-kadar", "aloisio", "maria-jose", "cleia-said"],
+  anchorYear: 2025, anchorFamily: "angela-kadar", sinceYear: 2026, swaps: [],
+}
+async function getNewYear(cfg: AppConfig): Promise<NewYear> {
+  const ny = ((await store().get("newyear", { type: "json" })) as NewYear | null) ?? DEFAULT_NY
+  return { ...DEFAULT_NY, ...ny, order: ny.order.filter((id) => cfg.families.some((f) => f.id === id)), swaps: ny.swaps ?? [] }
+}
+/** dono do Réveillon de cada ano pedido, já aplicando as trocas em ordem */
+function nyOwners(ny: NewYear, years: number[]) {
+  const n = ny.order.length, start = Math.max(0, ny.order.indexOf(ny.anchorFamily))
+  const base = (y: number) => (n ? ny.order[(((start + (y - ny.anchorYear)) % n) + n) % n] : "")
+  const m: Record<number, string> = {}
+  const get = (y: number) => (m[y] ??= base(y))
+  for (const s of ny.swaps) { const A = get(s.a), B = get(s.b); m[s.a] = B; m[s.b] = A }
+  years.forEach(get)
+  return m
+}
+/** anos de Réveillon cuja noite de 31/12 está dentro da estadia */
+function nyYearsIn(a: string, b: string) {
+  const out: number[] = []
+  for (let y = +a.slice(0, 4); y <= +b.slice(0, 4); y++) { const d = `${y}-12-31`; if (a <= d && d < b) out.push(y) }
+  return out
+}
+
 async function getConfig(): Promise<AppConfig> {
   return ((await store().get("config", { type: "json" })) as AppConfig | null) ?? DEFAULT_CONFIG
 }
@@ -173,6 +204,21 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
   }
 
   const all = await listBookings()
+
+  // Réveillon: só a família da vez (pela sequência + trocas) pode marcar a noite de 31/12
+  {
+    const years = nyYearsIn(input.checkIn, input.checkOut)
+    if (years.length) {
+      const ny = await getNewYear(cfg), owners = nyOwners(ny, years)
+      for (const y of years) {
+        const owner = owners[y]
+        if (owner && owner !== fam.id) {
+          const on = cfg.families.find((f) => f.id === owner)?.name ?? "outra família"
+          return { error: `O Réveillon ${y} → ${y + 1} é da família ${on}, pela sequência. Para a família ${fam.name} ir, registre antes uma troca no quadro do Réveillon.` }
+        }
+      }
+    }
+  }
 
   // Regra de marcações: cada família pode ter até N marcações EM ABERTO de tempo comum
   // e até N de feriado. Quando a estadia termina (passa o dia da saída), a vaga é liberada.
@@ -248,6 +294,7 @@ export default async (req: Request, _context: Context) => {
         // visitante sem login não recebe nenhum dado financeiro
         config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, families: cfg.families },
         bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
+        newYear: await getNewYear(cfg),
       }
       if (me?.role === "admin") out.accounts = [publicAccount(me, "admin"), publicAccount(await getAccount("editor"), "editor")]
       return json(out)
@@ -263,6 +310,24 @@ export default async (req: Request, _context: Context) => {
       const upd = { ...me, ...hashPassword(np), updatedAt: now() }
       await store().setJSON(`accounts/${me.role}`, upd)
       return json({ token: tokenFor(upd) })
+    }
+
+    /* Réveillon: registrar troca (admin e editor) */
+    if (resource === "newyear" && id === "swaps" && method === "POST" && !action) {
+      const ny = await getNewYear(cfg)
+      const a = Math.floor(Number(body.a)), b = Math.floor(Number(body.b))
+      const cur = +todayBR().slice(0, 4)
+      if (!(a >= cur && b >= cur && a <= cur + 20 && b <= cur + 20)) return fail("Escolha anos de Réveillon que ainda não passaram.")
+      if (a === b) return fail("Escolha dois anos diferentes.")
+      const owners = nyOwners(ny, [a, b])
+      if (owners[a] === owners[b]) return fail("Esses dois anos já são da mesma família.")
+      const booked = (await listBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === a || y === b))
+      if (booked) return fail(`Já existe reserva no Réveillon ${nyYearsIn(booked.checkIn, booked.checkOut)[0]}. Cancele a reserva antes de registrar a troca.`)
+      const swap: Swap = { id: randomBytes(4).toString("hex"), a: Math.min(a, b), b: Math.max(a, b),
+        famA: owners[Math.min(a, b)], famB: owners[Math.max(a, b)], by: me.name, at: now() }
+      const next = { ...ny, swaps: [...ny.swaps, swap] }
+      await store().setJSON("newyear", next)
+      return json(next, 201)
     }
 
     /* reservas: admin e editor */
@@ -311,6 +376,28 @@ export default async (req: Request, _context: Context) => {
 
     /* ---------- só administrador ---------- */
     if (me.role !== "admin") return fail("Acesso restrito ao administrador.", 403)
+
+    if (resource === "newyear" && id === "swaps" && action && method === "DELETE") {
+      const ny = await getNewYear(cfg)
+      const s = ny.swaps.find((x) => x.id === action)
+      if (!s) return fail("Troca não encontrada.", 404)
+      const booked = (await listBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === s.a || y === s.b))
+      if (booked) return fail("Já existe reserva num desses Réveillons. Cancele a reserva antes de desfazer a troca.")
+      const next = { ...ny, swaps: ny.swaps.filter((x) => x.id !== action) }
+      await store().setJSON("newyear", next)
+      return json(next)
+    }
+    if (resource === "newyear" && !id && method === "PUT") {
+      const ny = await getNewYear(cfg)
+      const order = (Array.isArray(body.order) ? body.order : ny.order).filter((x: any) => cfg.families.some((f) => f.id === x))
+      if (new Set(order).size !== order.length || !order.length) return fail("Ordem inválida.")
+      const anchorYear = Math.floor(Number(body.anchorYear ?? ny.anchorYear))
+      if (!(anchorYear >= 2000 && anchorYear <= 2100)) return fail("Ano de referência inválido.")
+      const anchorFamily = order.includes(body.anchorFamily) ? body.anchorFamily : order[0]
+      const next: NewYear = { ...ny, order, anchorYear, anchorFamily }
+      await store().setJSON("newyear", next)
+      return json(next)
+    }
 
     if (resource === "config" && method === "PUT") {
       const rate = Number(body.dailyRate)

@@ -111,6 +111,88 @@ function maxNightsFor(a,b,isHol){
   return{max:0,why:"feriado"};
 }
 const quotaTxt=(n,lim)=>lim>0?`${n}/${lim}`:`${n}`;
+
+/* ---------- Réveillon: sequência entre as famílias ----------
+   Ano Y = Réveillon da noite de 31/12/Y para 01/01/(Y+1). A vez segue a ordem a cada ano;
+   quem não vai perde a vez; só dá para ir fora da ordem com troca registrada. */
+const NY=()=>S.newYear||{order:[],anchorYear:2025,anchorFamily:"",sinceYear:2026,swaps:[]};
+function nyOwners(years){
+  const ny=NY(),order=ny.order.filter(id=>S.config.families.some(f=>f.id===id)),n=order.length,start=Math.max(0,order.indexOf(ny.anchorFamily));
+  const base=y=>n?order[(((start+(y-ny.anchorYear))%n)+n)%n]:"";
+  const m={},get=y=>(m[y]??=base(y));
+  for(const s of ny.swaps){const A=get(s.a),B=get(s.b);m[s.a]=B;m[s.b]=A}
+  years.forEach(get);return m;
+}
+const nyOwner=y=>nyOwners([y])[y];
+function nyYearsIn(a,b){const out=[];for(let y=+a.slice(0,4);y<=+b.slice(0,4);y++){const d=`${y}-12-31`;if(a<=d&&d<b)out.push(y)}return out}
+const nyBooking=y=>S.bookings.find(b=>nyYearsIn(b.checkIn,b.checkOut).includes(y));
+const nySwapOf=y=>NY().swaps.filter(s=>s.a===y||s.b===y).slice(-1)[0];
+const nyLabel=y=>`${y} → ${y+1}`;
+const curNY=()=>+today().slice(0,4);
+function newYearSection(){
+  const ny=NY(),cy=curNY();if(!ny.order.length) return "";
+  const owner=nyOwner(cy),f=fam(owner),bk=nyBooking(cy),sw=nySwapOf(cy);
+  const other=s=>s?fam(s.a===cy?s.famB:s.famA).name:"";
+  const now=bk?`<span class="pill acc">Marcado</span><span>${range(bk.checkIn,bk.checkOut)} · ${esc(bk.responsible)}</span>`
+    :`<span class="pill warn">Ainda não marcou</span><span>${cy===+today().slice(0,4)&&today()>`${cy}-12-31`?"":"A família da vez pode marcar a qualquer momento."}</span>`;
+  const rows=[];
+  for(let y=cy-2;y<=cy+4;y++){
+    if(y<ny.anchorYear) continue;
+    const o=nyOwner(y),fo=fam(o),b=nyBooking(y),s=nySwapOf(y);
+    let st;
+    if(y<cy) st=b?`<span class="pill ok">Foi${b.familyId!==o?": "+esc(fam(b.familyId).name):""}</span>`:y<ny.sinceYear?`<span class="pill ok">Foi</span>`:`<span class="pill mute">Não foi · perdeu a vez</span>`;
+    else if(y===cy) st=b?`<span class="pill acc">Marcado</span>`:`<span class="pill warn">Da vez</span>`;
+    else st=b?`<span class="pill acc">Marcado</span>`:"";
+    rows.push(`<div class="ny-row ${y===cy?"cur":""} ${y<cy?"past":""}" style="--fc:${fo.color}">
+      <span class="ny-year num">${nyLabel(y)}</span>
+      <span class="nm"><i class="dot"></i><span>${esc(fo.name)}</span>${s?`<span class="pill hot" title="Troca registrada">troca</span>`:""}</span>
+      <span class="ny-side">${st}</span></div>`);
+  }
+  const swaps=ny.swaps.filter(s=>s.b>=cy).map(s=>`<div class="ny-swap">${ic("undo",16)}<span><b>${nyLabel(s.a)}</b> ↔ <b>${nyLabel(s.b)}</b>: ${esc(fam(s.famA).name)} e ${esc(fam(s.famB).name)} trocaram${s.by?` · por ${esc(s.by)}`:""}</span>${isAdmin()?`<button class="btn danger sm" data-unswap="${s.id}">Desfazer</button>`:""}</div>`).join("");
+  const seq=ny.order.map(id=>esc(fam(id).name)).join(" → ");
+  return `<section class="sec">
+    <div class="sec-head"><h2>Réveillon</h2>${S.me?`<button class="link" id="nySwapBtn">${ic("undo",16)} Registrar troca</button>`:""}</div>
+    <div class="card ny">
+      <div class="ny-now" style="--fc:${f.color}">
+        <div class="eyebrow">Réveillon ${nyLabel(cy)} · vez de</div>
+        <div class="ny-fam"><i class="dot"></i>${esc(f.name)}</div>
+        <div class="ny-st">${now}</div>
+        ${sw?`<div class="muted">Por troca com a família ${esc(other(sw))}.</div>`:""}
+      </div>
+      <div class="ny-list">${rows.join("")}</div>
+      ${swaps?`<div class="ny-swaps"><div class="eyebrow">Trocas registradas</div>${swaps}</div>`:""}
+    </div>
+    <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Sequência: ${seq} → recomeça. Quem não vai perde a vez. Para ir fora da ordem, as famílias registram uma troca.</span></p>
+  </section>`;
+}
+function bindNewYear(v){
+  const sb=$("#nySwapBtn",v);if(sb) sb.onclick=openSwap;
+  $$("[data-unswap]",v).forEach(b=>armConfirm(b,"Confirmar",async()=>{
+    try{await api("newyear/swaps/"+b.dataset.unswap,{method:"DELETE"});toast("Troca desfeita");await refresh()}catch(e){toast(e.message,"info")}
+  }));
+}
+function openSwap(){
+  const cy=curNY(),years=[];for(let y=cy;y<=cy+6;y++)years.push(y);
+  const opt=sel=>years.map(y=>`<option value="${y}" ${y===sel?"selected":""}>${nyLabel(y)} · ${esc(fam(nyOwner(y)).name)}</option>`).join("");
+  openSheet(`${sheetHead("Registrar troca do Réveillon")}
+    <p class="muted" style="font-size:14px">As duas famílias trocam de ano entre si. É a única forma de uma família ir fora da ordem.</p>
+    <div class="form">
+      <div id="swErr" class="err hidden"></div>
+      <label class="field"><span>Réveillon<span class="req">*</span></span><select id="swA">${opt(cy)}</select></label>
+      <label class="field"><span>Troca com o Réveillon<span class="req">*</span></span><select id="swB">${opt(cy+1)}</select></label>
+      <div class="hol-note" id="swPrev"></div>
+      <button class="btn full" id="swSave">${ic("check",18,2.2)}Registrar troca</button>
+    </div>`);
+  const prev=()=>{const a=+$("#swA").value,b=+$("#swB").value,oa=nyOwner(a),ob=nyOwner(b);
+    $("#swSave").disabled=a===b||oa===ob;
+    $("#swPrev").innerHTML=ic("star",18,2)+(a===b?"<span>Escolha dois anos diferentes.</span>":oa===ob?"<span>Esses dois anos já são da mesma família.</span>"
+      :`<span>Com a troca, o Réveillon ${nyLabel(a)} fica com <b>${esc(fam(ob).name)}</b> e o ${nyLabel(b)} fica com <b>${esc(fam(oa).name)}</b>.</span>`)};
+  $("#swA").onchange=prev;$("#swB").onchange=prev;prev();
+  $("#swSave").onclick=async()=>{
+    try{await api("newyear/swaps",{method:"POST",body:{a:+$("#swA").value,b:+$("#swB").value}});closeSheet();toast("Troca registrada");await refresh()}
+    catch(e){$("#swErr").textContent=e.message;$("#swErr").classList.remove("hidden")}
+  };
+}
 const yr=d=>d.getFullYear()!==new Date().getFullYear()?` ${d.getFullYear()}`:"";
 const dm=s=>{const d=parse(s);return `${d.getDate()} ${MES[d.getMonth()]}${yr(d)}`};
 const dmw=s=>{const d=parse(s);return `${SEM[d.getDay()]}, ${d.getDate()} ${MES[d.getMonth()]}${yr(d)}`};
@@ -154,7 +236,7 @@ async function api(path,opts={}){
 function setToken(t){S.token=t;store.set("apto_token",t)}
 async function load(){
   const d=await api("state");
-  S.me=d.me;S.config=d.config;S.bookings=d.bookings;S.accounts=d.accounts||[];
+  S.me=d.me;S.config=d.config;S.bookings=d.bookings;S.accounts=d.accounts||[];S.newYear=d.newYear||null;
   if(S.token&&!S.me) setToken(null);
 }
 async function refresh(){try{await load();render()}catch(e){}}
@@ -198,8 +280,9 @@ const listOf=(arr,emptyMsg,emptyIc="inbox")=>arr.length?`<div class="list card">
 function holidayRows(list){
   return list.map(x=>{
     const d=parse(x.date),bs=bookingsOn(x.date);
+    const nyY=x.date.endsWith("-12-31")?+x.date.slice(0,4):x.date.endsWith("-01-01")?+x.date.slice(0,4)-1:null;
     const side=bs.length?bs.map(b=>`<span class="pill mute" style="--fc:${fam(b.familyId).color}"><i class="dot"></i>${esc(fam(b.familyId).name)}</span>`).join("")
-      :`<span class="pill ok">Livre</span>`;
+      :nyY!==null&&NY().order.length?`<span class="pill hot">Vez: ${esc(fam(nyOwner(nyY)).name)}</span>`:`<span class="pill ok">Livre</span>`;
     return `<button class="hrow ${x.top?"top":""}" data-hday="${x.date}" style="width:100%;text-align:left">
       <span class="hdate"><b class="num">${d.getDate()}</b><small>${MES[d.getMonth()]}</small></span>
       <span class="hmain"><b>${esc(x.name)}</b><span>${SEM[d.getDay()]} · ${HOL_TYPE[x.type]}${x.top?" · alta procura":""}</span></span>
@@ -248,6 +331,7 @@ function renderPainel(v){
       <div class="metric"><b class="num">${S.bookings.length}</b><span>Reservas no total</span></div>
       <div class="metric"><b class="num">${fut.reduce((s,b)=>s+b.nights,0)}</b><span>Diárias marcadas</span></div>
     </div>
+    ${newYearSection()}
     <section class="sec">
       <div class="sec-head"><h2>Próximos feriados</h2><button class="link" data-go="calendario">Calendário ${ic("right",16)}</button></div>
       <div class="card list">${holidayRows(holBetween(t,addDays(t,400)).slice(0,4))}</div>
@@ -265,6 +349,7 @@ function renderPainel(v){
       ${listOf(prox.slice(0,4),"Nenhuma estadia futura marcada.","cal")}
     </section>`;
   $$("[data-go]",v).forEach(b=>b.onclick=()=>{S.tab=b.dataset.go;render();window.scrollTo({top:0})});
+  bindNewYear(v);
   bindItems(v);
 }
 
@@ -441,6 +526,23 @@ function renderAdmin(v){
       <button class="btn" id="saveFams" style="align-self:flex-start">Salvar famílias</button>
     </section>
     <section class="sec">
+      <div class="sec-head"><h2>Sequência do Réveillon</h2></div>
+      <div class="card"><div class="setting">
+        <div class="field"><span>Ordem das famílias</span><div id="nyOrder">${NY().order.map((id,i,arr)=>`<div class="ord-row" data-id="${id}" style="--fc:${fam(id).color}">
+          <span class="num muted" style="width:18px">${i+1}</span><i class="dot"></i><span style="flex:1;font-weight:700">${esc(fam(id).name)}</span>
+          <button class="ibtn" data-up="${i}" ${i===0?"disabled":""} aria-label="Subir">${ic("left",16)}</button>
+          <button class="ibtn" data-down="${i}" ${i===arr.length-1?"disabled":""} aria-label="Descer">${ic("right",16)}</button></div>`).join("")}
+          ${S.config.families.filter(f=>!NY().order.includes(f.id)).map(f=>`<div class="ord-row" style="--fc:${f.color}"><span class="num muted" style="width:18px">–</span><i class="dot"></i><span style="flex:1;font-weight:700">${esc(f.name)}</span><button class="btn ghost sm" data-addord="${f.id}">Incluir</button></div>`).join("")}
+        </div></div>
+        <div class="row2">
+          <label class="field"><span>Ano de referência</span><input type="number" id="nyAnchorYear" min="2000" max="2100" value="${NY().anchorYear}" inputmode="numeric"></label>
+          <label class="field"><span>Família desse Réveillon</span><select id="nyAnchorFam">${NY().order.map(id=>`<option value="${id}" ${id===NY().anchorFamily?"selected":""}>${esc(fam(id).name)}</option>`).join("")}</select></label>
+        </div>
+        <p class="muted">Ex.: Réveillon de ${NY().anchorYear} → ${NY().anchorYear+1} foi da família ${esc(fam(NY().anchorFamily).name)}. Os anos seguintes seguem a ordem acima. Trocas são registradas no Painel.</p>
+        <button class="btn" id="saveNY" style="align-self:flex-start">Salvar sequência</button>
+      </div></div>
+    </section>
+    <section class="sec">
       <div class="sec-head"><h2>Logins</h2></div>
       <div class="card">
         ${S.accounts.map(a=>`<div class="acc-row">
@@ -474,6 +576,16 @@ function renderAdmin(v){
     armConfirm(b,"",()=>{const fs=readFams();fs.splice(i,1);S.config.families=fs;render();toast("Toque em Salvar famílias para confirmar","info")});
   });
   $$("[data-acc]",v).forEach(b=>b.onclick=()=>openAccount(S.accounts.find(a=>a.role===b.dataset.acc)));
+  /* sequência do Réveillon */
+  const ord=()=>$$("#nyOrder [data-id]").map(x=>x.dataset.id);
+  const mv=(i,d)=>{const o=ord();[o[i],o[i+d]]=[o[i+d],o[i]];S.newYear={...NY(),order:o};render()};
+  $$("[data-up]",v).forEach(b=>b.onclick=()=>mv(+b.dataset.up,-1));
+  $$("[data-down]",v).forEach(b=>b.onclick=()=>mv(+b.dataset.down,1));
+  $$("[data-addord]",v).forEach(b=>b.onclick=()=>{S.newYear={...NY(),order:[...ord(),b.dataset.addord]};render()});
+  $("#saveNY").onclick=async()=>{
+    try{await api("newyear",{method:"PUT",body:{order:ord(),anchorYear:+$("#nyAnchorYear").value,anchorFamily:$("#nyAnchorFam").value}});toast("Sequência salva");await refresh()}
+    catch(e){toast(e.message,"info")}
+  };
 }
 
 /* =========================================================
@@ -556,6 +668,7 @@ function openBooking(b=null,startDay=null){
       <div class="hol-note hidden" id="bkHol"></div>
       <div class="rule-warn hidden" id="bkRule"></div>
       <div class="rule-warn hidden" id="bkLen"></div>
+      <div class="rule-warn hidden" id="bkNY"></div>
       <div class="total"><div><small>Valor a pagar</small><span id="bkCalc"></span></div><b class="num" id="bkTotal"></b></div>
       <button class="btn full" id="bkSave">${b?"Salvar alterações":"Confirmar reserva"}</button>
     </div>`);
@@ -590,7 +703,12 @@ function openBooking(b=null,startDay=null){
       lEl.classList.toggle("hidden",!lBlocked);
       if(lBlocked) lEl.innerHTML=ic("info",18,2)+`<span>Em ${r.why} a estadia pode ter no máximo ${r.max} diárias. Esta tem ${n}. Ajuste a data de saída.</span>`;
     }else{hint.textContent="";lEl.classList.add("hidden")}
-    $("#bkSave").disabled=qBlocked||lBlocked;
+    /* Réveillon: só a família da vez */
+    const nyEl=$("#bkNY");let nyBlocked=false;
+    if(n>0&&famId){const bad=nyYearsIn(vi,vo).find(y=>{const o=nyOwner(y);return o&&o!==famId});
+      if(bad!==undefined){nyBlocked=true;nyEl.innerHTML=ic("star",18,2)+`<span>O Réveillon ${nyLabel(bad)} é da família ${esc(fam(nyOwner(bad)).name)}, pela sequência. Para ${esc(fam(famId).name)} ir, registre antes uma troca no quadro do Réveillon, no Painel.</span>`}}
+    nyEl.classList.toggle("hidden",!nyBlocked);
+    $("#bkSave").disabled=qBlocked||lBlocked||nyBlocked;
   };
   /* vagas da família e aviso da regra de marcações */
   const rules=isHol=>{
