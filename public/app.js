@@ -640,7 +640,9 @@ function openDetail(id){
           <label class="field"><span>Observação</span><input id="payNote" placeholder="Ex.: Pix"></label>
         </div>
         <button class="btn full" id="payOk">${ic("check",18,2.2)}Confirmar ${moneyS(b.amount)}</button></div>`):""}
-    ${S.me?`<div class="actions">
+    ${S.me&&st==="past"?`<p class="muted" style="display:flex;gap:6px;align-items:center">${ic("lock",16)}Estadia concluída: faz parte do histórico e não pode ser alterada.</p>
+      ${isAdmin()?`<button class="btn danger full" id="dDel">${ic("trash",18)}Excluir do histórico</button>`:""}`
+    :S.me?`<div class="actions">
       <button class="btn ghost" id="dEdit">${ic("edit",18)}Editar</button>
       ${!b.paid||isAdmin()?`<button class="btn danger" id="dDel">${ic("trash",18)}Cancelar</button>`:`<button class="btn ghost" disabled>Paga</button>`}
     </div>`:""}`);
@@ -705,9 +707,7 @@ function openBooking(b=null,startDay=null){
     const qBlocked=rules(n>0?(hs.length>0):null);
     /* duração máxima */
     const lEl=$("#bkLen"),hint=$("#bkLenHint");let lBlocked=false;
-    const pastStay=n>0&&vo<=today();
-    if(n>0&&pastStay){hint.textContent="Estadia passada: registro de histórico (sem limite de diárias e sem regra do Réveillon).";lEl.classList.add("hidden")}
-    else if(n>0){const r=maxNightsFor(vi,vo,hs.length>0);
+    if(n>0){const r=maxNightsFor(vi,vo,hs.length>0);
       hint.textContent=r.max>0?`Máximo de ${r.max} diárias${r.why==="janeiro e julho"?" em janeiro e julho":""}.`:"";
       lBlocked=r.max>0&&n>r.max;
       lEl.classList.toggle("hidden",!lBlocked);
@@ -715,7 +715,7 @@ function openBooking(b=null,startDay=null){
     }else{hint.textContent="";lEl.classList.add("hidden")}
     /* Réveillon: só a família da vez */
     const nyEl=$("#bkNY");let nyBlocked=false;
-    if(n>0&&famId&&!pastStay){const bad=nyYearsIn(vi,vo).find(y=>{const o=nyOwner(y);return o&&o!==famId});
+    if(n>0&&famId){const bad=nyYearsIn(vi,vo).find(y=>{const o=nyOwner(y);return o&&o!==famId});
       if(bad!==undefined){nyBlocked=true;nyEl.innerHTML=ic("star",18,2)+`<span>O Réveillon ${nyLabel(bad)} é da família ${esc(fam(nyOwner(bad)).name)}, pela sequência. Para ${esc(fam(famId).name)} ir, registre antes uma troca no quadro do Réveillon, no Painel.</span>`}}
     nyEl.classList.toggle("hidden",!nyBlocked);
     $("#bkSave").disabled=qBlocked||lBlocked||nyBlocked;
@@ -735,8 +735,8 @@ function openBooking(b=null,startDay=null){
   };
   $$("[data-fam]").forEach(btn=>btn.onclick=()=>{famId=btn.dataset.fam;$("#fFam").classList.remove("invalid");$$("[data-fam]").forEach(x=>x.classList.toggle("on",x===btn));fill();calc()});
   /* calendário do período: 1º toque = entrada, 2º toque = saída */
-  /* admin pode lançar estadias passadas (histórico); editor só a partir de hoje */
-  const minDay=isAdmin()?"1900-01-01":b&&b.checkIn<today()?b.checkIn:today();
+  /* datas passadas bloqueadas para todos (ao editar estadia em andamento, mantém a entrada original) */
+  const minDay=b&&b.checkIn<today()?b.checkIn:today();
   const busy=new Set();
   if(!S.config.allowOverlap) S.bookings.forEach(x=>{if(b&&x.id===b.id)return;for(let d=x.checkIn;d<x.checkOut;d=addDays(d,1))busy.add(d)});
   let rpSel={a:data.checkIn||"",b:data.checkOut||""},rpMsg="";

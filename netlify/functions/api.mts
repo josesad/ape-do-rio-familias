@@ -177,16 +177,20 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | un
   const nights = nightsBetween(input.checkIn, input.checkOut)
   if (nights < 1) return { error: "A saída precisa ser depois da entrada (mínimo 1 diária)." }
   if (nights > 60) return { error: "Estadia máxima de 60 diárias." }
-  // Estadia que já terminou = registro de histórico: só o administrador lança,
-  // e as regras de duração e do Réveillon não se aplicam (é o que aconteceu de fato).
-  const past = input.checkOut <= todayBR()
-  if (past && role !== "admin") return { error: "Só o administrador pode registrar estadias em datas passadas." }
+  // Datas passadas: ninguém marca (nem o admin). Ao editar uma estadia em andamento,
+  // a entrada original (já passada) pode ser mantida.
+  let keepIn = false
+  if (ignoreId) {
+    const old = (await store().get(`bookings/${ignoreId}`, { type: "json" })) as Booking | null
+    keepIn = !!old && old.checkIn === input.checkIn
+  }
+  if (input.checkIn < todayBR() && !keepIn) return { error: "Não é possível marcar em datas passadas. Escolha uma entrada a partir de hoje." }
   // Duração máxima (vale para qualquer estadia, com ou sem feriado):
   // janeiro e julho → até maxNightsPeak diárias; demais meses → até maxNightsCommon.
   {
     const peak = touchesPeak(input.checkIn, input.checkOut)
     const max = peak ? cfg.maxNightsPeak ?? 6 : cfg.maxNightsCommon ?? 10
-    if (!past && max > 0 && nights > max)
+    if (max > 0 && nights > max)
       return { error: peak
         ? `Em janeiro e julho a estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.`
         : `A estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.` }
@@ -211,7 +215,7 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | un
 
   // Réveillon: só a família da vez (pela sequência + trocas) pode marcar a noite de 31/12
   {
-    const years = past ? [] : nyYearsIn(input.checkIn, input.checkOut)
+    const years = nyYearsIn(input.checkIn, input.checkOut)
     if (years.length) {
       const ny = await getNewYear(cfg), owners = nyOwners(ny, years)
       for (const y of years) {
@@ -363,7 +367,10 @@ export default async (req: Request, _context: Context) => {
         await store().setJSON(`bookings/${id}`, upd)
         return json(upd)
       }
+      // estadias que já terminaram ficam travadas (histórico)
+      const finished = existing.checkOut <= todayBR()
       if (method === "PUT") {
+        if (finished) return fail("Essa estadia já terminou e não pode ser alterada.", 403)
         const v = await validateBooking(body, cfg, id, me.role)
         if (v.error) return fail(v.error)
         const rate = existing.rate ?? cfg.dailyRate
@@ -372,6 +379,7 @@ export default async (req: Request, _context: Context) => {
         return json(upd)
       }
       if (method === "DELETE") {
+        if (finished && me.role !== "admin") return fail("Essa estadia já terminou: só o administrador pode excluir.", 403)
         if (existing.paid && me.role !== "admin") return fail("Reserva já paga: só o administrador pode cancelar.", 403)
         await store().delete(`bookings/${id}`)
         return json({ ok: true })
