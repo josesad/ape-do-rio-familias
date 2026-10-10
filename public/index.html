@@ -282,6 +282,12 @@ input[type=date]{min-width:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 80px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:#FFFFFF;padding:11px 16px;border-radius:12px;font-weight:600;font-size:14px;max-width:calc(100vw - 32px);text-align:center;box-shadow:0 8px 24px rgba(29,42,49,.2);display:flex;align-items:center;gap:8px}
 .hidden{display:none!important}
 #bkRespHint:empty{display:none}
+.req{color:var(--bad);margin-left:2px}
+.req-note{font-size:12.5px;color:var(--ink-3);margin-top:-6px}
+.field.invalid > span{color:var(--bad)}
+.field.invalid input,.field.invalid select{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-soft)}
+.field.invalid .fam-pick button{border-color:color-mix(in srgb,var(--bad) 55%,var(--line))}
+.field-err{font-size:12.5px;color:var(--bad);font-weight:600}
 </style>
 </head>
 <body>
@@ -813,14 +819,15 @@ function openBooking(b=null,startDay=null){
   const rate=b?b.rate:S.config.dailyRate;
   openSheet(`${sheetHead(b?"Editar reserva":"Nova reserva")}
     <div class="form">
+      <p class="req-note"><span class="req">*</span> Campos obrigatórios</p>
       <div id="bkErr" class="err hidden"></div>
-      <div class="field"><span>Família</span>
+      <div class="field" id="fFam"><span>Família<span class="req" aria-hidden="true">*</span></span>
         <div class="fam-pick">${S.config.families.map(f=>`<button type="button" style="--fc:${f.color}" data-fam="${f.id}" class="${data.familyId===f.id?"on":""}"><i class="dot"></i><span>${esc(f.name)}</span></button>`).join("")}</div></div>
       <div class="row2">
-        <label class="field"><span>Entrada</span><input type="date" id="bkIn" value="${data.checkIn}"></label>
-        <label class="field"><span>Saída</span><input type="date" id="bkOut" value="${data.checkOut}"></label>
+        <label class="field" id="fIn"><span>Entrada<span class="req" aria-hidden="true">*</span></span><input type="date" id="bkIn" value="${data.checkIn}" required aria-required="true"></label>
+        <label class="field" id="fOut"><span>Saída<span class="req" aria-hidden="true">*</span></span><input type="date" id="bkOut" value="${data.checkOut}" required aria-required="true"></label>
       </div>
-      <label class="field"><span>Responsável</span><select id="bkResp"></select><small class="muted" id="bkRespHint"></small></label>
+      <label class="field" id="fResp"><span>Responsável<span class="req" aria-hidden="true">*</span></span><select id="bkResp" required aria-required="true"></select><small class="muted" id="bkRespHint"></small></label>
       <label class="field"><span>Observações <span style="color:var(--ink-3);font-weight:500">(opcional)</span></span><textarea id="bkNotes" rows="2" placeholder="Horário de chegada, pedidos…">${esc(data.notes)}</textarea></label>
       <div class="hol-note hidden" id="bkHol"></div>
       <div class="total"><div><small>Valor a pagar</small><span id="bkCalc"></span></div><b class="num" id="bkTotal"></b></div>
@@ -838,26 +845,33 @@ function openBooking(b=null,startDay=null){
     sel.innerHTML=`<option value="">Selecione o responsável</option>`+members.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join("")
       +(legacy?`<option value="${esc(legacy)}">${esc(legacy)} (fora da lista)</option>`:"");
     sel.value=(members.includes(respSel)||respSel===legacy)?respSel:(members.length===1?members[0]:"");
-    respSel=sel.value;
+    respSel=sel.value;if(sel.value)$("#fResp").classList.remove("invalid");
     hint.textContent=members.length?"":(isAdmin()?"Essa família ainda não tem integrantes. Cadastre em Ajustes → Famílias.":"Essa família ainda não tem integrantes cadastrados. Peça ao administrador para cadastrar.");
   };
-  $("#bkResp").onchange=e=>{respSel=e.target.value};
-  const calc=()=>{const n=nights($("#bkIn").value||today(),$("#bkOut").value||today());
-    $("#bkCalc").textContent=n>0?`${plural(n,"diária")} × ${money(rate)}`:"A saída precisa ser depois da entrada";
+  $("#bkResp").onchange=e=>{respSel=e.target.value;$("#fResp").classList.remove("invalid")};
+  const calc=()=>{const vi=$("#bkIn").value,vo=$("#bkOut").value,n=vi&&vo?nights(vi,vo):0;
+    $("#bkCalc").textContent=!vi||!vo?"Escolha a entrada e a saída":n>0?`${plural(n,"diária")} × ${money(rate)}`:"A saída precisa ser depois da entrada";
     $("#bkTotal").textContent=money(Math.max(0,n)*rate);
     const hs=n>0?holBetween($("#bkIn").value,$("#bkOut").value):[];
     $("#bkHol").classList.toggle("hidden",!hs.length);
     $("#bkHol").innerHTML=hs.length?ic("star",18,2)+`<span>Inclui ${hs.length>1?"feriados":"feriado"}: ${esc(hs.map(x=>`${x.short} (${dm(x.date)})`).join(", "))}</span>`:""};
-  $$("[data-fam]").forEach(btn=>btn.onclick=()=>{famId=btn.dataset.fam;$$("[data-fam]").forEach(x=>x.classList.toggle("on",x===btn));fill()});
-  $("#bkIn").onchange=()=>{if($("#bkOut").value<=$("#bkIn").value)$("#bkOut").value=addDays($("#bkIn").value,1);calc()};
-  $("#bkOut").onchange=calc;
+  $$("[data-fam]").forEach(btn=>btn.onclick=()=>{famId=btn.dataset.fam;$("#fFam").classList.remove("invalid");$$("[data-fam]").forEach(x=>x.classList.toggle("on",x===btn));fill()});
+  $("#bkIn").onchange=()=>{$("#fIn").classList.remove("invalid");if($("#bkIn").value&&$("#bkOut").value<=$("#bkIn").value)$("#bkOut").value=addDays($("#bkIn").value,1);calc()};
+  $("#bkOut").onchange=()=>{$("#fOut").classList.remove("invalid");calc()};
   fill();calc();
   $("#bkSave").onclick=async()=>{
     const btn=$("#bkSave");btn.disabled=true;$("#bkErr").classList.add("hidden");
     const body={familyId:famId,responsible:$("#bkResp").value,notes:$("#bkNotes").value,checkIn:$("#bkIn").value,checkOut:$("#bkOut").value};
     try{
-      if(!famId) throw new Error("Escolha a família.");
-      if(!$("#bkResp").value) throw new Error("Selecione o responsável da família.");
+      /* campos obrigatórios: família, entrada, saída e responsável */
+      $$(".field.invalid").forEach(x=>x.classList.remove("invalid"));
+      const miss=[];
+      if(!famId){miss.push("família");$("#fFam").classList.add("invalid")}
+      if(!body.checkIn){miss.push("entrada");$("#fIn").classList.add("invalid")}
+      if(!body.checkOut){miss.push("saída");$("#fOut").classList.add("invalid")}
+      if(!body.responsible){miss.push("responsável");$("#fResp").classList.add("invalid")}
+      if(miss.length) throw new Error(`Preencha os campos obrigatórios: ${miss.join(", ")}.`);
+      if(body.checkOut<=body.checkIn){$("#fOut").classList.add("invalid");throw new Error("A saída precisa ser depois da entrada.")}
       if(b) await api("bookings/"+b.id,{method:"PUT",body}); else await api("bookings",{method:"POST",body});
       closeSheet();toast(b?"Reserva atualizada":"Reserva confirmada");await refresh();
     }catch(e){$("#bkErr").textContent=e.message;$("#bkErr").classList.remove("hidden");$(".sheet").scrollTo({top:0,behavior:"smooth"});btn.disabled=false}
