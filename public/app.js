@@ -513,14 +513,16 @@ function renderAdmin(v){
     </section>
     <section class="sec">
       <div class="sec-head"><h2>Famílias e integrantes</h2><button class="link" id="addFam">${ic("plus",16)} Adicionar</button></div>
+      ${(()=>{S.famTab=Math.min(Math.max(0,S.famTab||0),c.families.length-1);return ""})()}
+      <div class="seg seg-scroll" id="famTabs" role="tablist">${c.families.map((f,i)=>`<button type="button" role="tab" class="${i===S.famTab?"on":""}" data-ftab="${i}" style="--fc:${f.color}"><i class="dot"></i><span>${esc(f.name.split(" ")[0])}</span></button>`).join("")}</div>
       <div class="card" id="famEdit">${c.families.map((f,i)=>`
-        <div class="setting" data-i="${i}" data-color="${f.color}">
+        <div class="setting ${i===S.famTab?"":"hidden"}" data-i="${i}" data-color="${f.color}" role="tabpanel">
           <div class="row2" style="grid-template-columns:minmax(0,1fr) auto;align-items:end">
             <label class="field"><span>Nome da família</span><input id="famName${i}" data-k="name" value="${esc(f.name)}"></label>
             <button class="btn danger sm" data-rmfam="${i}" style="height:46px" aria-label="Remover família">${ic("trash",18)}</button>
           </div>
           <div class="field"><span>Cor</span><div class="swatches">${PALETTE.concat(PALETTE.includes(f.color.toUpperCase())?[]:[f.color]).map(col=>`<button type="button" style="--sw:${col}" class="${col.toUpperCase()===f.color.toUpperCase()?"on":""}" data-sw="${col}" aria-label="Cor ${col}"></button>`).join("")}</div></div>
-          <label class="field"><span>Integrantes (um por linha)</span><textarea id="famMembers${i}" rows="3" data-k="members" placeholder="Ex.: Tio João">${esc(f.members.join("\n"))}</textarea></label>
+          <label class="field"><span>Integrantes (um por linha) · <span class="muted" data-count>${plural(f.members.length,"integrante")}</span></span><textarea id="famMembers${i}" rows="${Math.max(4,Math.min(10,f.members.length+1))}" data-k="members" placeholder="Ex.: Tio João">${esc(f.members.join("\n"))}</textarea></label>
         </div>`).join("")}
       </div>
       <button class="btn" id="saveFams" style="align-self:flex-start">Salvar famílias</button>
@@ -563,17 +565,25 @@ function renderAdmin(v){
     const f=S.config.families[+el.dataset.i]||{};
     return{id:f.id,name:$('[data-k="name"]',el).value,color:el.dataset.color,members:$('[data-k="members"]',el).value.split("\n").map(s=>s.trim()).filter(Boolean)};
   });
-  $$("[data-sw]",v).forEach(b=>b.onclick=()=>{const box=b.closest("[data-i]");box.dataset.color=b.dataset.sw;$$("[data-sw]",box).forEach(x=>x.classList.toggle("on",x===b))});
+  $$("[data-sw]",v).forEach(b=>b.onclick=()=>{const box=b.closest("[data-i]");box.dataset.color=b.dataset.sw;$$("[data-sw]",box).forEach(x=>x.classList.toggle("on",x===b));
+    const tab=$(`[data-ftab="${box.dataset.i}"]`,v);if(tab)tab.style.setProperty("--fc",b.dataset.sw)});
+  /* abas das famílias: troca sem recarregar, para não perder o que foi digitado */
+  $$("[data-ftab]",v).forEach(t=>t.onclick=()=>{S.famTab=+t.dataset.ftab;
+    $$("[data-ftab]",v).forEach(x=>x.classList.toggle("on",x===t));
+    $$("#famEdit [data-i]",v).forEach(p=>p.classList.toggle("hidden",+p.dataset.i!==S.famTab))});
+  $$("#famEdit [data-i]",v).forEach(p=>{const i=p.dataset.i,tab=$(`[data-ftab="${i}"] span`,v);
+    $('[data-k="name"]',p).oninput=e=>{if(tab)tab.textContent=e.target.value.split(" ")[0]||"Família"};
+    $('[data-k="members"]',p).oninput=e=>{$("[data-count]",p).textContent=plural(e.target.value.split("\n").map(s=>s.trim()).filter(Boolean).length,"integrante")}});
   $("#saveFams").onclick=async()=>{try{await api("config",{method:"PUT",body:{...S.config,families:readFams()}});toast("Famílias salvas");await refresh()}catch(e){toast(e.message,"info")}};
   $("#addFam").onclick=()=>{
     const used=S.config.families.map(f=>f.color.toUpperCase());
     S.config.families=[...readFams(),{id:"familia-"+Date.now().toString(36),name:"Nova família",color:PALETTE.find(p=>!used.includes(p))||PALETTE[0],members:[]}];
-    render();toast("Preencha e toque em Salvar famílias","info");
+    S.famTab=S.config.families.length-1;render();toast("Preencha e toque em Salvar famílias","info");
   };
   $$("[data-rmfam]",v).forEach(b=>{
     const i=+b.dataset.rmfam,f=S.config.families[i];
     if(S.bookings.some(x=>x.familyId===f.id)){b.onclick=()=>toast("Essa família tem reservas e não pode ser removida","info");return}
-    armConfirm(b,"",()=>{const fs=readFams();fs.splice(i,1);S.config.families=fs;render();toast("Toque em Salvar famílias para confirmar","info")});
+    armConfirm(b,"",()=>{const fs=readFams();fs.splice(i,1);S.config.families=fs;S.famTab=Math.max(0,i-1);render();toast("Toque em Salvar famílias para confirmar","info")});
   });
   $$("[data-acc]",v).forEach(b=>b.onclick=()=>openAccount(S.accounts.find(a=>a.role===b.dataset.acc)));
   /* sequência do Réveillon */
