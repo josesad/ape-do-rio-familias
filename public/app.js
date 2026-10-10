@@ -103,12 +103,11 @@ function openOf(famId,ignoreId){
   const t=today(),bs=S.bookings.filter(b=>b.familyId===famId&&b.id!==ignoreId&&b.checkOut>t);
   return{common:bs.filter(b=>!isHolBooking(b)),hol:bs.filter(isHolBooking)};
 }
-/* duração máxima: janeiro e julho → maxNightsPeak; tempo comum → maxNightsCommon; feriado fora disso → sem limite */
+/* duração máxima (qualquer estadia, com ou sem feriado): janeiro e julho → maxNightsPeak; demais meses → maxNightsCommon */
 function touchesPeak(a,b){for(let d=a;d<b;d=addDays(d,1)){const m=+d.slice(5,7);if(m===1||m===7)return true}return false}
 function maxNightsFor(a,b,isHol){
   if(touchesPeak(a,b)) return{max:S.config.maxNightsPeak??6,why:"janeiro e julho"};
-  if(!isHol) return{max:S.config.maxNightsCommon??10,why:"tempo comum"};
-  return{max:0,why:"feriado"};
+  return{max:S.config.maxNightsCommon??10,why:"demais meses"};
 }
 const quotaTxt=(n,lim)=>lim>0?`${n}/${lim}`:`${n}`;
 
@@ -342,7 +341,7 @@ function renderPainel(v){
         <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Tempo comum em aberto</div><div class="h c">Feriados em aberto</div>
         ${rows}
       </div>
-      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().common||"∞"} marcações em aberto de tempo comum e ${limits().hol||"∞"} de feriado. A vaga é liberada quando a estadia termina. Duração máxima: ${(S.config.maxNightsCommon??10)||"∞"} diárias em tempo comum e ${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho.</span></p>
+      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().common||"∞"} marcações em aberto de tempo comum e ${limits().hol||"∞"} de feriado. A vaga é liberada quando a estadia termina. Cada estadia pode ter até ${(S.config.maxNightsCommon??10)||"∞"} diárias (${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho).</span></p>
     </section>
     <section class="sec">
       <div class="sec-head"><h2>Próximas estadias</h2><button class="link" data-go="reservas">Ver todas ${ic("right",16)}</button></div>
@@ -501,10 +500,10 @@ function renderAdmin(v){
           </div>
           <p class="muted">Por família. Uma reserva que inclui qualquer feriado (da entrada à saída) conta como feriado. Use 0 para não limitar.</p>
           <div class="row2">
-            <label class="field"><span>Máx. de diárias: tempo comum</span><input type="number" min="0" max="50" step="1" id="cfgMaxNightsCommon" value="${c.maxNightsCommon??10}" inputmode="numeric"></label>
+            <label class="field"><span>Máx. de diárias por estadia</span><input type="number" min="0" max="50" step="1" id="cfgMaxNightsCommon" value="${c.maxNightsCommon??10}" inputmode="numeric"></label>
             <label class="field"><span>Máx. de diárias: jan. e jul.</span><input type="number" min="0" max="50" step="1" id="cfgMaxNightsPeak" value="${c.maxNightsPeak??6}" inputmode="numeric"></label>
           </div>
-          <p class="muted">Janeiro e julho valem para qualquer reserva com diária nesses meses, com ou sem feriado. Use 0 para não limitar.</p>
+          <p class="muted">Vale para qualquer estadia, com ou sem feriado. Em janeiro e julho vale o limite menor. Use 0 para não limitar.</p>
           <label class="check"><input type="checkbox" id="cfgOverlap" ${c.allowOverlap?"checked":""}>Permitir duas famílias no mesmo período</label>
           <p class="muted">A nova diária vale só para reservas feitas depois da mudança.</p>
           <button class="btn" id="saveCfg" style="align-self:flex-start">Salvar cobrança e regras</button>
@@ -707,10 +706,10 @@ function openBooking(b=null,startDay=null){
     /* duração máxima */
     const lEl=$("#bkLen"),hint=$("#bkLenHint");let lBlocked=false;
     if(n>0){const r=maxNightsFor(vi,vo,hs.length>0);
-      hint.textContent=r.max>0?`Máximo de ${r.max} diárias (${r.why}).`:"Estadia com feriado: sem limite de diárias.";
+      hint.textContent=r.max>0?`Máximo de ${r.max} diárias${r.why==="janeiro e julho"?" em janeiro e julho":""}.`:"";
       lBlocked=r.max>0&&n>r.max;
       lEl.classList.toggle("hidden",!lBlocked);
-      if(lBlocked) lEl.innerHTML=ic("info",18,2)+`<span>Em ${r.why} a estadia pode ter no máximo ${r.max} diárias. Esta tem ${n}. Ajuste a data de saída.</span>`;
+      if(lBlocked) lEl.innerHTML=ic("info",18,2)+`<span>${r.why==="janeiro e julho"?"Em janeiro e julho a":"A"} estadia pode ter no máximo ${r.max} diárias. Esta tem ${n}. Escolha uma saída mais cedo.</span>`;
     }else{hint.textContent="";lEl.classList.add("hidden")}
     /* Réveillon: só a família da vez */
     const nyEl=$("#bkNY");let nyBlocked=false;
@@ -743,15 +742,18 @@ function openBooking(b=null,startDay=null){
     const {y,m}=rpM,first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),t=today();
     const title=first.toLocaleDateString("pt-BR",{month:"long"});
     let cells="";for(let i=0;i<first.getDay();i++)cells+=`<span class="rp-d out"></span>`;
+    /* depois de escolher a entrada: dias além do limite de diárias ficam travados */
+    const tooFar=s=>{if(!rpSel.a||rpSel.b||s<=rpSel.a)return false;const r=maxNightsFor(rpSel.a,s,false);return r.max>0&&nights(rpSel.a,s)>r.max};
     for(let dd=1;dd<=days;dd++){
-      const s=`${y}-${pad(m+1)}-${pad(dd)}`,{a,b:z}=rpSel;
-      const cls=[s<minDay?"dis":"",busy.has(s)?"busy":"",holOn(s).length?"hol":"",s===t?"today":"",
+      const s=`${y}-${pad(m+1)}-${pad(dd)}`,{a,b:z}=rpSel,off=s<minDay||tooFar(s);
+      const cls=[off?"dis":"",busy.has(s)?"busy":"",holOn(s).length?"hol":"",s===t?"today":"",
         a&&s===a?"start":"",z&&s===z?"end":"",a&&z&&s>a&&s<z?"in":"",a&&z?"has":""].join(" ");
-      cells+=`<button type="button" class="rp-d ${cls}" data-rp="${s}" ${s<minDay?"disabled":""} aria-label="${dmw(s)}${busy.has(s)?" · reservado":""}"><span>${dd}</span></button>`;
+      cells+=`<button type="button" class="rp-d ${cls}" data-rp="${s}" ${off?"disabled":""} aria-label="${dmw(s)}${busy.has(s)?" · reservado":""}"><span>${dd}</span></button>`;
     }
     const nm=n=>n?plural(n,"diária"):"";
     const sum=rpSel.a?`<div class="rp-sum"><div><small>Entrada</small><b>${dmw(rpSel.a)}</b></div><div><small>Saída</small><b>${rpSel.b?dmw(rpSel.b):"—"}</b></div></div>`:"";
-    const hint=rpMsg||(!rpSel.a?"Toque no dia de entrada.":!rpSel.b?"Agora toque no dia de saída.":`${nm(nights(rpSel.a,rpSel.b))} · toque em outro dia para recomeçar.`);
+    const lastOut=()=>{let d=rpSel.a,last=null;for(let i=0;i<70;i++){d=addDays(d,1);const r=maxNightsFor(rpSel.a,d,false);if(r.max>0&&nights(rpSel.a,d)>r.max)break;last=d}return last};
+    const hint=rpMsg||(!rpSel.a?"Toque no dia de entrada.":!rpSel.b?`Agora toque no dia de saída${(()=>{const l=lastOut();return l?` (até ${dm(l)})`:""})()}.`:`${nm(nights(rpSel.a,rpSel.b))} · toque em outro dia para recomeçar.`);
     $("#rp").innerHTML=`${sum}
       <div class="rp-head"><button type="button" class="ibtn" id="rpPrev" aria-label="Mês anterior">${ic("left",16)}</button>
         <b>${title[0].toUpperCase()+title.slice(1)} ${y}</b>

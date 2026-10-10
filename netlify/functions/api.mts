@@ -177,15 +177,15 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
   const nights = nightsBetween(input.checkIn, input.checkOut)
   if (nights < 1) return { error: "A saída precisa ser depois da entrada (mínimo 1 diária)." }
   if (nights > 60) return { error: "Estadia máxima de 60 diárias." }
-  // Duração máxima: janeiro e julho → até maxNightsPeak diárias; tempo comum → até maxNightsCommon.
-  // Estadias com feriado fora de janeiro/julho não têm esse limite.
+  // Duração máxima (vale para qualquer estadia, com ou sem feriado):
+  // janeiro e julho → até maxNightsPeak diárias; demais meses → até maxNightsCommon.
   {
-    const peak = touchesPeak(input.checkIn, input.checkOut), hol = hasHoliday(input.checkIn, input.checkOut)
-    const max = peak ? cfg.maxNightsPeak ?? 6 : !hol ? cfg.maxNightsCommon ?? 10 : 0
+    const peak = touchesPeak(input.checkIn, input.checkOut)
+    const max = peak ? cfg.maxNightsPeak ?? 6 : cfg.maxNightsCommon ?? 10
     if (max > 0 && nights > max)
       return { error: peak
         ? `Em janeiro e julho a estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.`
-        : `Em tempo comum a estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.` }
+        : `A estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.` }
   }
   // quantidade de pessoas deixou de ser pedida; mantém o valor só se vier
   const people = input.people == null || input.people === "" ? null : Math.floor(Number(input.people))
