@@ -13,7 +13,7 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 type Role = "admin" | "editor"
 
 interface Family { id: string; name: string; color: string; members: string[] }
-interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxCommon?: number; maxHoliday?: number }
+interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxCommon?: number; maxHoliday?: number; maxNightsCommon?: number; maxNightsPeak?: number }
 interface Account { role: Role; username: string; name: string; salt: string; hash: string; updatedAt: string }
 interface Booking {
   id: string; familyId: string; responsible: string; people?: number | null; guestNames: string
@@ -27,6 +27,8 @@ const DEFAULT_CONFIG: AppConfig = {
   allowOverlap: false,
   maxCommon: 2,
   maxHoliday: 2,
+  maxNightsCommon: 10,
+  maxNightsPeak: 6,
   families: [
     { id: "maria-jose", name: "Maria José", color: "#D4899A", members: ["Maria José"] },
     { id: "angela-kadar", name: "Ângela Kadar", color: "#6EA6C4", members: ["Ângela Kadar"] },
@@ -64,6 +66,12 @@ function holidayDates(y: number) {
   const rel = (n: number) => { const d = new Date(e); d.setUTCDate(d.getUTCDate() + n); return ymd(d) }
   const fixed = ["01-01", "01-20", "04-21", "04-23", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-24", "12-25", "12-31"]
   return (_hol[y] = [...fixed.map((md) => `${y}-${md}`), rel(-48), rel(-47), rel(-46), rel(-2), rel(0), rel(60)])
+}
+/** alguma diária (noite) cai em janeiro ou julho? */
+function touchesPeak(a: string, b: string) {
+  const d = new Date(a + "T12:00:00Z"), end = new Date(b + "T12:00:00Z")
+  for (; d < end; d.setUTCDate(d.getUTCDate() + 1)) { const m = d.getUTCMonth() + 1; if (m === 1 || m === 7) return true }
+  return false
 }
 /** a estadia inclui algum feriado entre a entrada e a saída (inclusive)? */
 function hasHoliday(a: string, b: string) {
@@ -138,6 +146,16 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
   const nights = nightsBetween(input.checkIn, input.checkOut)
   if (nights < 1) return { error: "A saída precisa ser depois da entrada (mínimo 1 diária)." }
   if (nights > 60) return { error: "Estadia máxima de 60 diárias." }
+  // Duração máxima: janeiro e julho → até maxNightsPeak diárias; tempo comum → até maxNightsCommon.
+  // Estadias com feriado fora de janeiro/julho não têm esse limite.
+  {
+    const peak = touchesPeak(input.checkIn, input.checkOut), hol = hasHoliday(input.checkIn, input.checkOut)
+    const max = peak ? cfg.maxNightsPeak ?? 6 : !hol ? cfg.maxNightsCommon ?? 10 : 0
+    if (max > 0 && nights > max)
+      return { error: peak
+        ? `Em janeiro e julho a estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.`
+        : `Em tempo comum a estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.` }
+  }
   // quantidade de pessoas deixou de ser pedida; mantém o valor só se vier
   const people = input.people == null || input.people === "" ? null : Math.floor(Number(input.people))
   if (people !== null && !(people >= 1 && people <= 30)) return { error: "Quantidade de pessoas inválida." }
@@ -228,7 +246,7 @@ export default async (req: Request, _context: Context) => {
       const out: any = {
         me: me ? { role: me.role, username: me.username, name: me.name } : null,
         // visitante sem login não recebe nenhum dado financeiro
-        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, families: cfg.families },
+        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, families: cfg.families },
         bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
       }
       if (me?.role === "admin") out.accounts = [publicAccount(me, "admin"), publicAccount(await getAccount("editor"), "editor")]
@@ -308,6 +326,7 @@ export default async (req: Request, _context: Context) => {
       const next: AppConfig = {
         dailyRate: rate, allowOverlap: !!body.allowOverlap, families: clean,
         maxCommon: lim(body.maxCommon, cfg.maxCommon ?? 2), maxHoliday: lim(body.maxHoliday, cfg.maxHoliday ?? 2),
+        maxNightsCommon: lim(body.maxNightsCommon, cfg.maxNightsCommon ?? 10), maxNightsPeak: lim(body.maxNightsPeak, cfg.maxNightsPeak ?? 6),
       }
       await store().setJSON("config", next)
       return json(next)
