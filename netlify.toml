@@ -7,3 +7,7 @@
   [headers.values]
     X-Frame-Options = "DENY"
     Referrer-Policy = "same-origin"
+    X-Content-Type-Options = "nosniff"
+    # Só permite scripts do próprio site. Isso também impede o selo
+    # "Powered by Netlify" (que é injetado como script inline) de aparecer.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
