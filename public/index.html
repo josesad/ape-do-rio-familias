@@ -281,6 +281,7 @@ input[type=date]{min-width:0}
 @media(min-width:820px){.fab{bottom:24px;right:max(24px,calc(50vw - 440px))}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 80px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:#FFFFFF;padding:11px 16px;border-radius:12px;font-weight:600;font-size:14px;max-width:calc(100vw - 32px);text-align:center;box-shadow:0 8px 24px rgba(29,42,49,.2);display:flex;align-items:center;gap:8px}
 .hidden{display:none!important}
+#bkRespHint:empty{display:none}
 </style>
 </head>
 <body>
@@ -819,14 +820,28 @@ function openBooking(b=null,startDay=null){
         <label class="field"><span>Entrada</span><input type="date" id="bkIn" value="${data.checkIn}"></label>
         <label class="field"><span>Saída</span><input type="date" id="bkOut" value="${data.checkOut}"></label>
       </div>
-      <label class="field"><span>Responsável</span><input id="bkResp" list="bkMembers" value="${esc(data.responsible)}" placeholder="Nome de quem vai ou de quem marcou"><datalist id="bkMembers"></datalist></label>
+      <label class="field"><span>Responsável</span><select id="bkResp"></select><small class="muted" id="bkRespHint"></small></label>
       <label class="field"><span>Observações <span style="color:var(--ink-3);font-weight:500">(opcional)</span></span><textarea id="bkNotes" rows="2" placeholder="Horário de chegada, pedidos…">${esc(data.notes)}</textarea></label>
       <div class="hol-note hidden" id="bkHol"></div>
       <div class="total"><div><small>Valor a pagar</small><span id="bkCalc"></span></div><b class="num" id="bkTotal"></b></div>
       <button class="btn full" id="bkSave">${b?"Salvar alterações":"Confirmar reserva"}</button>
     </div>`);
   let famId=data.familyId;
-  const fill=()=>{$("#bkMembers").innerHTML=(famId?fam(famId).members:[]).map(m=>`<option value="${esc(m)}">`).join("")};
+  /* responsável: só integrantes da família escolhida */
+  let respSel=data.responsible||"";
+  const fill=()=>{
+    const sel=$("#bkResp"),hint=$("#bkRespHint");
+    if(!famId){sel.innerHTML=`<option value="">Escolha a família primeiro</option>`;sel.disabled=true;hint.textContent="";return}
+    const f=fam(famId),members=[...f.members];
+    const legacy=b&&b.familyId===famId&&b.responsible&&!members.includes(b.responsible)?b.responsible:null;
+    sel.disabled=false;
+    sel.innerHTML=`<option value="">Selecione o responsável</option>`+members.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join("")
+      +(legacy?`<option value="${esc(legacy)}">${esc(legacy)} (fora da lista)</option>`:"");
+    sel.value=(members.includes(respSel)||respSel===legacy)?respSel:(members.length===1?members[0]:"");
+    respSel=sel.value;
+    hint.textContent=members.length?"":(isAdmin()?"Essa família ainda não tem integrantes. Cadastre em Ajustes → Famílias.":"Essa família ainda não tem integrantes cadastrados. Peça ao administrador para cadastrar.");
+  };
+  $("#bkResp").onchange=e=>{respSel=e.target.value};
   const calc=()=>{const n=nights($("#bkIn").value||today(),$("#bkOut").value||today());
     $("#bkCalc").textContent=n>0?`${plural(n,"diária")} × ${money(rate)}`:"A saída precisa ser depois da entrada";
     $("#bkTotal").textContent=money(Math.max(0,n)*rate);
@@ -842,6 +857,7 @@ function openBooking(b=null,startDay=null){
     const body={familyId:famId,responsible:$("#bkResp").value,notes:$("#bkNotes").value,checkIn:$("#bkIn").value,checkOut:$("#bkOut").value};
     try{
       if(!famId) throw new Error("Escolha a família.");
+      if(!$("#bkResp").value) throw new Error("Selecione o responsável da família.");
       if(b) await api("bookings/"+b.id,{method:"PUT",body}); else await api("bookings",{method:"POST",body});
       closeSheet();toast(b?"Reserva atualizada":"Reserva confirmada");await refresh();
     }catch(e){$("#bkErr").textContent=e.message;$("#bkErr").classList.remove("hidden");$(".sheet").scrollTo({top:0,behavior:"smooth"});btn.disabled=false}

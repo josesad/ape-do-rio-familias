@@ -115,7 +115,17 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
   const people = input.people == null || input.people === "" ? null : Math.floor(Number(input.people))
   if (people !== null && !(people >= 1 && people <= 30)) return { error: "Quantidade de pessoas inválida." }
   const responsible = String(input.responsible || "").trim().slice(0, 80)
-  if (!responsible) return { error: "Informe o responsável pela reserva." }
+  if (!responsible) return { error: "Selecione o responsável pela reserva." }
+  // o responsável precisa ser integrante da família escolhida
+  // (exceção: ao editar uma reserva antiga, mantém o responsável que já estava nela)
+  if (!fam.members.includes(responsible)) {
+    let keep = false
+    if (ignoreId) {
+      const old = (await store().get(`bookings/${ignoreId}`, { type: "json" })) as Booking | null
+      keep = !!old && old.familyId === fam.id && old.responsible === responsible
+    }
+    if (!keep) return { error: `${responsible} não está entre os integrantes da família ${fam.name}. Cadastre em Ajustes → Famílias.` }
+  }
 
   if (!cfg.allowOverlap) {
     const clash = (await listBookings()).find((b) => b.id !== ignoreId && input.checkIn < b.checkOut && b.checkIn < input.checkOut)
