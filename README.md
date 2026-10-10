@@ -15,6 +15,7 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - A vaga é liberada quando a estadia termina (passa o dia da saída).
 - Duração máxima por estadia: **10 diárias** (com ou sem feriado) e **6 diárias em janeiro e julho**. Ajustável em Ajustes.
 - A regra é verificada no servidor; o formulário mostra as vagas e avisa antes de salvar.
+- **Histórico:** só o administrador pode lançar estadias em datas passadas. Para estadias que já terminaram, não valem o limite de diárias nem a regra do Réveillon (é o registro do que aconteceu); a sobreposição continua bloqueada.
 
 ## Réveillon (Ano Novo)
 - Sequência fixa entre as famílias (padrão: Ângela → Aloísio → Maria José → Cleia → recomeça), a partir do Réveillon 2025→2026 (Ângela).

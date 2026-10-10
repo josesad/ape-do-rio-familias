@@ -170,19 +170,23 @@ async function currentAccount(req: Request) {
 const nightsBetween = (a: string, b: string) =>
   Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000)
 
-async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
+async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | undefined, role: Role) {
   const fam = cfg.families.find((f) => f.id === input.familyId)
   if (!fam) return { error: "Escolha uma família válida." }
   if (!DATE_RE.test(input.checkIn || "") || !DATE_RE.test(input.checkOut || "")) return { error: "Datas inválidas." }
   const nights = nightsBetween(input.checkIn, input.checkOut)
   if (nights < 1) return { error: "A saída precisa ser depois da entrada (mínimo 1 diária)." }
   if (nights > 60) return { error: "Estadia máxima de 60 diárias." }
+  // Estadia que já terminou = registro de histórico: só o administrador lança,
+  // e as regras de duração e do Réveillon não se aplicam (é o que aconteceu de fato).
+  const past = input.checkOut <= todayBR()
+  if (past && role !== "admin") return { error: "Só o administrador pode registrar estadias em datas passadas." }
   // Duração máxima (vale para qualquer estadia, com ou sem feriado):
   // janeiro e julho → até maxNightsPeak diárias; demais meses → até maxNightsCommon.
   {
     const peak = touchesPeak(input.checkIn, input.checkOut)
     const max = peak ? cfg.maxNightsPeak ?? 6 : cfg.maxNightsCommon ?? 10
-    if (max > 0 && nights > max)
+    if (!past && max > 0 && nights > max)
       return { error: peak
         ? `Em janeiro e julho a estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.`
         : `A estadia pode ter no máximo ${max} diárias. Esta tem ${nights}.` }
@@ -207,7 +211,7 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
 
   // Réveillon: só a família da vez (pela sequência + trocas) pode marcar a noite de 31/12
   {
-    const years = nyYearsIn(input.checkIn, input.checkOut)
+    const years = past ? [] : nyYearsIn(input.checkIn, input.checkOut)
     if (years.length) {
       const ny = await getNewYear(cfg), owners = nyOwners(ny, years)
       for (const y of years) {
@@ -333,7 +337,7 @@ export default async (req: Request, _context: Context) => {
     /* reservas: admin e editor */
     if (resource === "bookings") {
       if (method === "POST" && !id) {
-        const v = await validateBooking(body, cfg)
+        const v = await validateBooking(body, cfg, undefined, me.role)
         if (v.error) return fail(v.error)
         const b: Booking = {
           id: `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`,
@@ -360,7 +364,7 @@ export default async (req: Request, _context: Context) => {
         return json(upd)
       }
       if (method === "PUT") {
-        const v = await validateBooking(body, cfg, id)
+        const v = await validateBooking(body, cfg, id, me.role)
         if (v.error) return fail(v.error)
         const rate = existing.rate ?? cfg.dailyRate
         const upd: Booking = { ...existing, ...v.data!, rate, amount: v.data!.nights * rate, updatedAt: now() }
