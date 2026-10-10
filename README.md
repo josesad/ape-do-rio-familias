@@ -10,7 +10,7 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - ⚙️ **Admin**: valor da diária, famílias (nome, cor, integrantes) e usuários
 
 ## Regras de marcação
-- Cada família pode ter até **2 marcações em aberto de tempo comum** e **2 de feriado** (ajustável em Ajustes → Cobrança e regras).
+- Cada família pode ter no máximo **2 marcações futuras em aberto no total** (até 2 de tempo comum e até 2 de feriado) (ajustável em Ajustes → Cobrança e regras).
 - Uma reserva que inclui qualquer feriado (da entrada à saída) conta como feriado.
 - A vaga é liberada quando a estadia termina (passa o dia da saída).
 - Duração máxima por estadia: **10 diárias** (com ou sem feriado) e **6 diárias em janeiro e julho**. Ajustável em Ajustes.

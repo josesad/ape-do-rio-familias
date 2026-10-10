@@ -98,10 +98,10 @@ const bookingsOn=s=>S.bookings.filter(b=>b.checkIn<=s&&s<b.checkOut);
    Cada família pode ter até maxCommon marcações EM ABERTO de tempo comum e até maxHoliday
    de feriado. A vaga é liberada quando a estadia termina (passa o dia da saída). */
 const isHolBooking=b=>holBetween(b.checkIn,b.checkOut).length>0;
-const limits=()=>({common:S.config.maxCommon??2,hol:S.config.maxHoliday??2});
+const limits=()=>({total:S.config.maxTotal??2,common:S.config.maxCommon??2,hol:S.config.maxHoliday??2});
 function openOf(famId,ignoreId){
   const t=today(),bs=S.bookings.filter(b=>b.familyId===famId&&b.id!==ignoreId&&b.checkOut>t);
-  return{common:bs.filter(b=>!isHolBooking(b)),hol:bs.filter(isHolBooking)};
+  return{all:bs,common:bs.filter(b=>!isHolBooking(b)),hol:bs.filter(isHolBooking)};
 }
 /* duração máxima (qualquer estadia, com ou sem feriado): janeiro e julho → maxNightsPeak; demais meses → maxNightsCommon */
 function touchesPeak(a,b){for(let d=a;d<b;d=addDays(d,1)){const m=+d.slice(5,7);if(m===1||m===7)return true}return false}
@@ -320,7 +320,7 @@ function renderPainel(v){
     const bs=S.bookings.filter(b=>b.familyId===f.id),o=openOf(f.id),L=limits();
     const q=(n,lim)=>`<div class="c num ${lim>0&&n>=lim?"full":""}">${quotaTxt(n,lim)}</div>`;
     return `<div class="n" style="--fc:${f.color}"><i class="dot"></i><span>${esc(f.name)}</span></div>
-      <div class="c num">${bs.length}</div>${q(o.common.length,L.common)}${q(o.hol.length,L.hol)}`;
+      <div class="c num">${bs.length}</div>${q(o.all.length,L.total)}${q(o.hol.length,L.hol)}`;
   }).join("");
 
   v.innerHTML=`
@@ -338,10 +338,10 @@ function renderPainel(v){
     <section class="sec">
       <div class="sec-head"><h2>Por família</h2></div>
       <div class="card ftable">
-        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Tempo comum em aberto</div><div class="h c">Feriados em aberto</div>
+        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Futuras em aberto</div><div class="h c">Feriados em aberto</div>
         ${rows}
       </div>
-      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().common||"∞"} marcações em aberto de tempo comum e ${limits().hol||"∞"} de feriado. A vaga é liberada quando a estadia termina. Cada estadia pode ter até ${(S.config.maxNightsCommon??10)||"∞"} diárias (${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho).</span></p>
+      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().total||"∞"} marcações futuras em aberto (no máximo ${limits().common||"∞"} de tempo comum e ${limits().hol||"∞"} de feriado). A vaga é liberada quando a estadia termina. Cada estadia pode ter até ${(S.config.maxNightsCommon??10)||"∞"} diárias (${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho).</span></p>
     </section>
     <section class="sec">
       <div class="sec-head"><h2>Próximas estadias</h2><button class="link" data-go="reservas">Ver todas ${ic("right",16)}</button></div>
@@ -495,6 +495,7 @@ function renderAdmin(v){
         <div class="setting">
           <label class="field"><span>Valor da diária (R$)</span><input type="number" min="0" step="1" id="cfgRate" value="${c.dailyRate}" inputmode="decimal"></label>
           <div class="row2">
+            <label class="field" style="grid-column:1/-1"><span>Máx. de marcações futuras em aberto (total)</span><input type="number" min="0" max="50" step="1" id="cfgMaxTotal" value="${c.maxTotal??2}" inputmode="numeric"></label>
             <label class="field"><span>Máx. em aberto: tempo comum</span><input type="number" min="0" max="50" step="1" id="cfgMaxCommon" value="${c.maxCommon??2}" inputmode="numeric"></label>
             <label class="field"><span>Máx. em aberto: feriados</span><input type="number" min="0" max="50" step="1" id="cfgMaxHoliday" value="${c.maxHoliday??2}" inputmode="numeric"></label>
           </div>
@@ -558,7 +559,7 @@ function renderAdmin(v){
     </section>`;
 
   $("#saveCfg").onclick=async()=>{
-    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),maxCommon:Number($("#cfgMaxCommon").value),maxHoliday:Number($("#cfgMaxHoliday").value),maxNightsCommon:Number($("#cfgMaxNightsCommon").value),maxNightsPeak:Number($("#cfgMaxNightsPeak").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança e regras salvas");await refresh()}catch(e){toast(e.message,"info")}
+    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),maxTotal:Number($("#cfgMaxTotal").value),maxCommon:Number($("#cfgMaxCommon").value),maxHoliday:Number($("#cfgMaxHoliday").value),maxNightsCommon:Number($("#cfgMaxNightsCommon").value),maxNightsPeak:Number($("#cfgMaxNightsPeak").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança e regras salvas");await refresh()}catch(e){toast(e.message,"info")}
   };
   const readFams=()=>$$("#famEdit [data-i]").map(el=>{
     const f=S.config.families[+el.dataset.i]||{};
@@ -724,9 +725,14 @@ function openBooking(b=null,startDay=null){
   const rules=isHol=>{
     const qEl=$("#bkQuota"),wEl=$("#bkRule"),L=limits();
     if(!famId){qEl.classList.add("hidden");wEl.classList.add("hidden");return false}
-    const o=openOf(famId,b?.id),cf=L.common>0&&o.common.length>=L.common,hf=L.hol>0&&o.hol.length>=L.hol;
+    const o=openOf(famId,b?.id),cf=L.common>0&&o.common.length>=L.common,hf=L.hol>0&&o.hol.length>=L.hol,tf=L.total>0&&o.all.length>=L.total;
     qEl.classList.remove("hidden");
-    qEl.innerHTML=`<span class="muted" style="align-self:center">Em aberto:</span><span class="qchip ${cf?"full":""} ${isHol===false?"cur":""}">Tempo comum ${quotaTxt(o.common.length,L.common)}</span><span class="qchip ${hf?"full":""} ${isHol===true?"cur":""}">Feriados ${quotaTxt(o.hol.length,L.hol)}</span>`;
+    qEl.innerHTML=`<span class="muted" style="align-self:center">Em aberto:</span><span class="qchip ${tf?"full":""}">Total ${quotaTxt(o.all.length,L.total)}</span><span class="qchip ${cf?"full":""} ${isHol===false?"cur":""}">Tempo comum ${quotaTxt(o.common.length,L.common)}</span><span class="qchip ${hf?"full":""} ${isHol===true?"cur":""}">Feriados ${quotaTxt(o.hol.length,L.hol)}</span>`;
+    /* limite total: bloqueia assim que a família é escolhida */
+    if(tf){const list=o.all.map(x=>range(x.checkIn,x.checkOut)).join(" e "),free=o.all.map(x=>x.checkOut).sort()[0];
+      wEl.classList.remove("hidden");
+      wEl.innerHTML=ic("info",18,2)+`<span>A família ${esc(fam(famId).name)} já tem ${o.all.length} marcações futuras em aberto (${esc(list)}). Ela só pode marcar de novo a partir de ${dm(free)}, quando a primeira terminar.</span>`;
+      return true}
     const vo=$("#bkOut").value,blocked=isHol!==null&&vo>today()&&(isHol?hf:cf);
     wEl.classList.toggle("hidden",!blocked);
     if(blocked){const list=(isHol?o.hol:o.common).map(x=>range(x.checkIn,x.checkOut)).join(" e ");

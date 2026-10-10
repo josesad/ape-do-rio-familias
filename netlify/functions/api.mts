@@ -13,7 +13,7 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 type Role = "admin" | "editor"
 
 interface Family { id: string; name: string; color: string; members: string[] }
-interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxCommon?: number; maxHoliday?: number; maxNightsCommon?: number; maxNightsPeak?: number }
+interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxTotal?: number; maxCommon?: number; maxHoliday?: number; maxNightsCommon?: number; maxNightsPeak?: number }
 interface Account { role: Role; username: string; name: string; salt: string; hash: string; updatedAt: string }
 interface Booking {
   id: string; familyId: string; responsible: string; people?: number | null; guestNames: string
@@ -25,6 +25,7 @@ interface Booking {
 const DEFAULT_CONFIG: AppConfig = {
   dailyRate: 70,
   allowOverlap: false,
+  maxTotal: 2,
   maxCommon: 2,
   maxHoliday: 2,
   maxNightsCommon: 10,
@@ -231,6 +232,14 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | un
   // Regra de marcações: cada família pode ter até N marcações EM ABERTO de tempo comum
   // e até N de feriado. Quando a estadia termina (passa o dia da saída), a vaga é liberada.
   if (input.checkOut > todayBR()) {
+    // limite TOTAL de marcações futuras em aberto (tempo comum + feriado)
+    const maxTotal = cfg.maxTotal ?? 2
+    const openAll = all.filter((b) => b.id !== ignoreId && b.familyId === fam.id && b.checkOut > todayBR())
+    if (maxTotal > 0 && openAll.length >= maxTotal) {
+      const list = openAll.map((b) => `${br(b.checkIn)} a ${br(b.checkOut)}`).join(" e ")
+      const free = openAll.map((b) => b.checkOut).sort()[0]
+      return { error: `A família ${fam.name} já tem ${openAll.length} marcações futuras em aberto (${list}). O limite é ${maxTotal}. Ela só pode marcar de novo a partir de ${br(free)}, quando a primeira terminar.` }
+    }
     const isHol = hasHoliday(input.checkIn, input.checkOut)
     const limit = isHol ? cfg.maxHoliday ?? 2 : cfg.maxCommon ?? 2
     if (limit > 0) {
@@ -300,7 +309,7 @@ export default async (req: Request, _context: Context) => {
       const out: any = {
         me: me ? { role: me.role, username: me.username, name: me.name } : null,
         // visitante sem login não recebe nenhum dado financeiro
-        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, families: cfg.families },
+        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxTotal: cfg.maxTotal ?? 2, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, families: cfg.families },
         bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
         newYear: await getNewYear(cfg),
       }
@@ -424,7 +433,7 @@ export default async (req: Request, _context: Context) => {
       const lim = (v: any, d: number) => { const n = Math.floor(Number(v ?? d)); return n >= 0 && n <= 50 ? n : d }
       const next: AppConfig = {
         dailyRate: rate, allowOverlap: !!body.allowOverlap, families: clean,
-        maxCommon: lim(body.maxCommon, cfg.maxCommon ?? 2), maxHoliday: lim(body.maxHoliday, cfg.maxHoliday ?? 2),
+        maxTotal: lim(body.maxTotal, cfg.maxTotal ?? 2), maxCommon: lim(body.maxCommon, cfg.maxCommon ?? 2), maxHoliday: lim(body.maxHoliday, cfg.maxHoliday ?? 2),
         maxNightsCommon: lim(body.maxNightsCommon, cfg.maxNightsCommon ?? 10), maxNightsPeak: lim(body.maxNightsPeak, cfg.maxNightsPeak ?? 6),
       }
       await store().setJSON("config", next)
