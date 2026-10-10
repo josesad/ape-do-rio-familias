@@ -169,10 +169,12 @@ export default async (req: Request, _context: Context) => {
 
     /* ---------- visualização pública ---------- */
     if (resource === "state" && method === "GET") {
+      const all = await listBookings()
       const out: any = {
         me: me ? { role: me.role, username: me.username, name: me.name } : null,
-        config: cfg,
-        bookings: await listBookings(),
+        // visitante sem login não recebe nenhum dado financeiro
+        config: me ? cfg : { allowOverlap: cfg.allowOverlap, families: cfg.families },
+        bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
       }
       if (me?.role === "admin") out.accounts = [publicAccount(me, "admin"), publicAccount(await getAccount("editor"), "editor")]
       return json(out)

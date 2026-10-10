@@ -10,7 +10,7 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - ⚙️ **Admin**: valor da diária, famílias (nome, cor, integrantes) e usuários
 
 ## Acessos
-🌐 **Link público:** qualquer pessoa com o link vê painel, calendário, reservas e financeiro, sem login.
+🌐 **Link público:** qualquer pessoa com o link vê painel, calendário e reservas, sem login. Valores, diária e pagamentos (aba Financeiro) só aparecem para admin e editor — o servidor nem envia esses dados para quem não está logado.
 
 | Login | Pode |
 |---|---|

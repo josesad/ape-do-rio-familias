@@ -405,6 +405,7 @@ const fam=id=>S.config.families.find(f=>f.id===id)||{id,name:"Família removida"
 const initials=s=>s.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const isAdmin=()=>S.me?.role==="admin";
 const canBook=()=>!!S.me;
+const canSeeMoney=()=>!!S.me; /* financeiro: só administrador e editor */
 const statusOf=b=>{const t=today();return b.checkOut<=t?"past":b.checkIn<=t?"now":"future"};
 
 function toast(msg,icon="check"){
@@ -448,9 +449,10 @@ const TABS=[["painel","grid","Painel"],["calendario","cal","Calendário"],["rese
 $("#brandMark").innerHTML=ic("logo",22,2);
 function render(){
   if(S.tab==="admin"&&!isAdmin()) S.tab="painel";
+  if(S.tab==="financeiro"&&!canSeeMoney()) S.tab="painel";
   $("#meBtn").innerHTML=S.me?`<span class="av">${esc(initials(S.me.name))}</span><span>${esc(S.me.name.split(" ")[0])}</span>`:`${ic("login",18)}<span>Entrar</span>`;
   $("#roleLabel").textContent=S.me?`Conectado como ${ROLE_NAME[S.me.role].toLowerCase()}`:"Agenda das famílias";
-  $("#tabs").innerHTML=TABS.filter(([k])=>k!=="admin"||isAdmin()).map(([k,i,l])=>`<button data-tab="${k}" class="${S.tab===k?"on":""}">${ic(i,22)}<span>${l}</span></button>`).join("");
+  $("#tabs").innerHTML=TABS.filter(([k])=>(k!=="admin"||isAdmin())&&(k!=="financeiro"||canSeeMoney())).map(([k,i,l])=>`<button data-tab="${k}" class="${S.tab===k?"on":""}">${ic(i,22)}<span>${l}</span></button>`).join("");
   $("#fab").innerHTML=ic("plus",20,2.2)+"<span>Nova reserva</span>";
   $("#fab").classList.toggle("hidden",!canBook()||S.tab==="admin");
   ({painel:renderPainel,calendario:renderCalendario,reservas:renderReservas,financeiro:renderFinanceiro,admin:renderAdmin})[S.tab]($("#view"));
@@ -462,7 +464,8 @@ $("#meBtn").onclick=()=>S.me?openMe():openLogin();
 /* ---------- item de reserva ---------- */
 function bookingItem(b){
   const f=fam(b.familyId),d=parse(b.checkIn),st=statusOf(b);
-  const pill=st==="now"?`<span class="pill acc">Hospedados</span>`:b.paid?`<span class="pill ok">Pago</span>`:`<span class="pill warn">Pendente</span>`;
+  const money_=canSeeMoney();
+  const pill=st==="now"?`<span class="pill acc">Hospedados</span>`:!money_?(st==="past"?`<span class="pill mute">Concluída</span>`:`<span class="pill mute">Agendada</span>`):b.paid?`<span class="pill ok">Pago</span>`:`<span class="pill warn">Pendente</span>`;
   return `<button class="bk ${st==="past"?"past":""}" style="--fc:${f.color}" data-open="${b.id}">
     <span class="bk-date"><b class="num">${d.getDate()}</b><small>${MES[d.getMonth()]}</small></span>
     <span class="bk-main">
@@ -471,7 +474,7 @@ function bookingItem(b){
       <span class="bk-sub">${esc(b.responsible)} · ${plural(b.people,"pessoa")}</span>
       ${(()=>{const hs=holBetween(b.checkIn,b.checkOut);return hs.length?`<span class="bk-hol">${ic("star",13,2)}${esc(holNames(hs))}</span>`:""})()}
     </span>
-    <span class="bk-side"><b class="num">${moneyS(b.amount)}</b>${pill}</span>
+    <span class="bk-side">${money_?`<b class="num">${moneyS(b.amount)}</b>`:""}${pill}</span>
   </button>`;
 }
 const listOf=(arr,emptyMsg,emptyIc="inbox")=>arr.length?`<div class="list card">${arr.map(bookingItem).join("")}</div>`:`<div class="card empty"><span class="ei">${ic(emptyIc,22)}</span>${emptyMsg}</div>`;
@@ -614,13 +617,14 @@ function openDay(s){
    ========================================================= */
 function renderReservas(v){
   const t=today();let list=S.bookings.slice();
+  if(S.listFilter==="pendentes"&&!canSeeMoney()) S.listFilter="proximas";
   if(S.listFilter==="proximas") list=list.filter(b=>b.checkOut>t);
   if(S.listFilter==="passadas") list=list.filter(b=>b.checkOut<=t).reverse();
   if(S.listFilter==="pendentes") list=list.filter(b=>!b.paid);
   if(S.famFilter) list=list.filter(b=>b.familyId===S.famFilter);
   v.innerHTML=`
     <section class="sec">
-      <div class="seg" role="tablist">${[["proximas","Próximas"],["passadas","Passadas"],["pendentes","Pendentes"],["todas","Todas"]].map(([k,l])=>`<button class="${S.listFilter===k?"on":""}" data-lf="${k}">${l}</button>`).join("")}</div>
+      <div class="seg" role="tablist">${[["proximas","Próximas"],["passadas","Passadas"],["pendentes","Pendentes"],["todas","Todas"]].filter(([k])=>k!=="pendentes"||canSeeMoney()).map(([k,l])=>`<button class="${S.listFilter===k?"on":""}" data-lf="${k}">${l}</button>`).join("")}</div>
       <div class="chips">
         <button class="chip ${!S.famFilter?"on":""}" data-ff="">Todas as famílias</button>
         ${S.config.families.map(f=>`<button class="chip fam ${S.famFilter===f.id?"on":""}" style="--fc:${f.color}" data-ff="${f.id}"><i class="dot"></i>${esc(f.name)}</button>`).join("")}
@@ -766,14 +770,14 @@ function openDetail(id){
     <dl class="dl">
       ${row("Entrada",dmw(b.checkIn))}
       ${row("Saída",dmw(b.checkOut))}
-      ${row("Diárias",`${b.nights} × ${money(b.rate)}`)}
+      ${row("Diárias",canSeeMoney()?`${b.nights} × ${money(b.rate)}`:String(b.nights))}
       ${row("Pessoas",String(b.people))}
       ${row("Responsável",esc(b.responsible))}
       ${row("Quem vai",esc(b.guestNames))}
       ${row("Observações",esc(b.notes))}
-      ${row("Valor",`<span class="num">${money(b.amount)}</span>`)}
-      ${row("Pagamento",b.paid?`<span class="pill ok">Pago em ${dm(b.paidAt)}</span>`:`<span class="pill warn">Pendente</span>`)}
-      ${b.paid&&b.paymentNote?row("Obs. do pagamento",esc(b.paymentNote)):""}
+      ${canSeeMoney()?row("Valor",`<span class="num">${money(b.amount)}</span>`):""}
+      ${canSeeMoney()?row("Pagamento",b.paid?`<span class="pill ok">Pago em ${dm(b.paidAt)}</span>`:`<span class="pill warn">Pendente</span>`):""}
+      ${canSeeMoney()&&b.paid&&b.paymentNote?row("Obs. do pagamento",esc(b.paymentNote)):""}
       ${row("Situação",st==="now"?"Hospedados agora":st==="past"?"Concluída":"Agendada")}
       ${row("Feriados",esc(holBetween(b.checkIn,b.checkOut).map(x=>`${x.short} (${dm(x.date)})`).join(", ")))}
       ${row("Marcada por",esc(b.createdByName))}
