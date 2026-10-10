@@ -4,7 +4,7 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 
 ## O que tem
 - 📊 **Painel**: quem está no apê agora / próxima estadia, agendamentos e pessoas agendadas por família
-- 📅 **Calendário**: mês a mês, cada família com sua cor, dias passados mais claros
+- 📅 **Calendário**: mês a mês, cada família com sua cor, dias passados mais claros e feriados destacados (nacionais, do Rio e datas de alta procura como Ano Novo, Carnaval e Natal — calculados automaticamente para qualquer ano)
 - 📝 **Reservas**: filtros (próximas, passadas, pendentes, por família)
 - 💰 **Financeiro**: diária de R$ 70, total gerado, recebido, a receber, por família e por ano
 - ⚙️ **Admin**: valor da diária, famílias (nome, cor, integrantes) e usuários
