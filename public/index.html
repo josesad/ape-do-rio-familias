@@ -400,6 +400,7 @@ const dm=s=>{const d=parse(s);return `${d.getDate()} ${MES[d.getMonth()]}${yr(d)
 const dmw=s=>{const d=parse(s);return `${SEM[d.getDay()]}, ${d.getDate()} ${MES[d.getMonth()]}${yr(d)}`};
 const range=(a,b)=>{const A=parse(a),B=parse(b);return (A.getMonth()===B.getMonth()&&A.getFullYear()===B.getFullYear())?`${A.getDate()} – ${B.getDate()} ${MES[B.getMonth()]}${yr(B)}`:`${dm(a)} – ${dm(b)}`};
 const plural=(n,s,p)=>`${n} ${n===1?s:(p||s+"s")}`;
+const ppl=b=>b.people?` · ${plural(b.people,"pessoa")}`:"";
 const ROLE_NAME={admin:"Administrador",editor:"Editor"};
 const fam=id=>S.config.families.find(f=>f.id===id)||{id,name:"Família removida",color:"#A0A8AD",members:[]};
 const initials=s=>s.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
@@ -471,7 +472,7 @@ function bookingItem(b){
     <span class="bk-main">
       <span class="bk-fam"><i class="dot"></i><span>${esc(f.name)}</span></span>
       <span class="bk-sub">${range(b.checkIn,b.checkOut)} · ${plural(b.nights,"diária")}</span>
-      <span class="bk-sub">${esc(b.responsible)} · ${plural(b.people,"pessoa")}</span>
+      <span class="bk-sub">${esc(b.responsible)}${ppl(b)}</span>
       ${(()=>{const hs=holBetween(b.checkIn,b.checkOut);return hs.length?`<span class="bk-hol">${ic("star",13,2)}${esc(holNames(hs))}</span>`:""})()}
     </span>
     <span class="bk-side">${money_?`<b class="num">${moneyS(b.amount)}</b>`:""}${pill}</span>
@@ -509,7 +510,7 @@ function renderPainel(v){
       <div class="status-main">
         <span>${agora?`<span class="pill acc">No apartamento agora</span>`:`<span class="pill mute">Próxima estadia</span>`}</span>
         <div class="status-fam"><i class="dot"></i>${esc(f.name)}</div>
-        <div class="status-meta">${range(destaque.checkIn,destaque.checkOut)} · ${plural(destaque.people,"pessoa")}</div>
+        <div class="status-meta">${range(destaque.checkIn,destaque.checkOut)} · ${plural(destaque.nights,"diária")} · ${esc(destaque.responsible)}</div>
       </div>
       <div class="status-count"><b class="num">${dias}</b><span>${agora?(dias===1?"dia para<br>a saída":"dias para<br>a saída"):(dias===1?"dia para<br>a chegada":"dias para<br>a chegada")}</span></div>
     </button>`;
@@ -520,14 +521,14 @@ function renderPainel(v){
   const rows=S.config.families.map(f=>{
     const bs=S.bookings.filter(b=>b.familyId===f.id),fb=bs.filter(b=>statusOf(b)!=="past");
     return `<div class="n" style="--fc:${f.color}"><i class="dot"></i><span>${esc(f.name)}</span></div>
-      <div class="c num">${bs.length}</div><div class="c num">${fb.reduce((s,b)=>s+b.people,0)}</div><div class="c num">${bs.reduce((s,b)=>s+b.people,0)}</div>`;
+      <div class="c num">${bs.length}</div><div class="c num">${fb.length}</div><div class="c num">${bs.reduce((s,b)=>s+b.nights,0)}</div>`;
   }).join("");
 
   v.innerHTML=`
     ${status}
     <div class="card metrics">
       <div class="metric"><b class="num">${fut.length}</b><span>Reservas futuras</span></div>
-      <div class="metric"><b class="num">${fut.reduce((s,b)=>s+b.people,0)}</b><span>Pessoas agendadas</span></div>
+      <div class="metric"><b class="num">${S.bookings.length}</b><span>Reservas no total</span></div>
       <div class="metric"><b class="num">${fut.reduce((s,b)=>s+b.nights,0)}</b><span>Diárias marcadas</span></div>
     </div>
     <section class="sec">
@@ -537,7 +538,7 @@ function renderPainel(v){
     <section class="sec">
       <div class="sec-head"><h2>Por família</h2></div>
       <div class="card ftable">
-        <div class="h n">Família</div><div class="h c">Reservas</div><div class="h c">Pessoas agendadas</div><div class="h c">Pessoas no total</div>
+        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Reservas futuras</div><div class="h c">Diárias no total</div>
         ${rows}
       </div>
     </section>
@@ -771,7 +772,7 @@ function openDetail(id){
       ${row("Entrada",dmw(b.checkIn))}
       ${row("Saída",dmw(b.checkOut))}
       ${row("Diárias",canSeeMoney()?`${b.nights} × ${money(b.rate)}`:String(b.nights))}
-      ${row("Pessoas",String(b.people))}
+      ${b.people?row("Pessoas",String(b.people)):""}
       ${row("Responsável",esc(b.responsible))}
       ${row("Quem vai",esc(b.guestNames))}
       ${row("Observações",esc(b.notes))}
@@ -807,7 +808,7 @@ function openDetail(id){
 
 /* ---------- nova reserva / editar ---------- */
 function openBooking(b=null,startDay=null){
-  const data=b?{...b}:{familyId:"",responsible:"",people:1,guestNames:"",notes:"",checkIn:startDay||today(),checkOut:addDays(startDay||today(),2)};
+  const data=b?{...b}:{familyId:"",responsible:"",notes:"",checkIn:startDay||today(),checkOut:addDays(startDay||today(),2)};
   const rate=b?b.rate:S.config.dailyRate;
   openSheet(`${sheetHead(b?"Editar reserva":"Nova reserva")}
     <div class="form">
@@ -818,10 +819,7 @@ function openBooking(b=null,startDay=null){
         <label class="field"><span>Entrada</span><input type="date" id="bkIn" value="${data.checkIn}"></label>
         <label class="field"><span>Saída</span><input type="date" id="bkOut" value="${data.checkOut}"></label>
       </div>
-      <label class="field"><span>Responsável</span><input id="bkResp" list="bkMembers" value="${esc(data.responsible)}" placeholder="Nome de quem vai"><datalist id="bkMembers"></datalist></label>
-      <div class="field"><span>Quantas pessoas</span>
-        <div class="stepper"><button type="button" id="pMinus" aria-label="Menos">${ic("minus",20,2.2)}</button><input id="bkPeople" type="number" min="1" max="30" value="${data.people}" inputmode="numeric" aria-label="Pessoas"><button type="button" id="pPlus" aria-label="Mais">${ic("plus",20,2.2)}</button></div></div>
-      <label class="field"><span>Quem vai <span style="color:var(--ink-3);font-weight:500">(opcional)</span></span><textarea id="bkGuests" rows="2" placeholder="Ex.: Ana, Pedro e as crianças">${esc(data.guestNames)}</textarea></label>
+      <label class="field"><span>Responsável</span><input id="bkResp" list="bkMembers" value="${esc(data.responsible)}" placeholder="Nome de quem vai ou de quem marcou"><datalist id="bkMembers"></datalist></label>
       <label class="field"><span>Observações <span style="color:var(--ink-3);font-weight:500">(opcional)</span></span><textarea id="bkNotes" rows="2" placeholder="Horário de chegada, pedidos…">${esc(data.notes)}</textarea></label>
       <div class="hol-note hidden" id="bkHol"></div>
       <div class="total"><div><small>Valor a pagar</small><span id="bkCalc"></span></div><b class="num" id="bkTotal"></b></div>
@@ -838,13 +836,10 @@ function openBooking(b=null,startDay=null){
   $$("[data-fam]").forEach(btn=>btn.onclick=()=>{famId=btn.dataset.fam;$$("[data-fam]").forEach(x=>x.classList.toggle("on",x===btn));fill()});
   $("#bkIn").onchange=()=>{if($("#bkOut").value<=$("#bkIn").value)$("#bkOut").value=addDays($("#bkIn").value,1);calc()};
   $("#bkOut").onchange=calc;
-  const ppl=$("#bkPeople");
-  $("#pMinus").onclick=()=>{ppl.value=Math.max(1,+ppl.value-1)};
-  $("#pPlus").onclick=()=>{ppl.value=Math.min(30,+ppl.value+1)};
   fill();calc();
   $("#bkSave").onclick=async()=>{
     const btn=$("#bkSave");btn.disabled=true;$("#bkErr").classList.add("hidden");
-    const body={familyId:famId,responsible:$("#bkResp").value,people:+ppl.value,guestNames:$("#bkGuests").value,notes:$("#bkNotes").value,checkIn:$("#bkIn").value,checkOut:$("#bkOut").value};
+    const body={familyId:famId,responsible:$("#bkResp").value,notes:$("#bkNotes").value,checkIn:$("#bkIn").value,checkOut:$("#bkOut").value};
     try{
       if(!famId) throw new Error("Escolha a família.");
       if(b) await api("bookings/"+b.id,{method:"PUT",body}); else await api("bookings",{method:"POST",body});

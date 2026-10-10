@@ -16,7 +16,7 @@ interface Family { id: string; name: string; color: string; members: string[] }
 interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[] }
 interface Account { role: Role; username: string; name: string; salt: string; hash: string; updatedAt: string }
 interface Booking {
-  id: string; familyId: string; responsible: string; people: number; guestNames: string
+  id: string; familyId: string; responsible: string; people?: number | null; guestNames: string
   checkIn: string; checkOut: string; nights: number; rate: number; amount: number
   paid: boolean; paidAt: string | null; paymentNote: string; notes: string
   createdBy: string; createdByName: string; createdAt: string; updatedAt: string
@@ -111,8 +111,9 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
   const nights = nightsBetween(input.checkIn, input.checkOut)
   if (nights < 1) return { error: "A saída precisa ser depois da entrada (mínimo 1 diária)." }
   if (nights > 60) return { error: "Estadia máxima de 60 diárias." }
-  const people = Math.floor(Number(input.people))
-  if (!people || people < 1 || people > 30) return { error: "Informe quantas pessoas vão (1 a 30)." }
+  // quantidade de pessoas deixou de ser pedida; mantém o valor só se vier
+  const people = input.people == null || input.people === "" ? null : Math.floor(Number(input.people))
+  if (people !== null && !(people >= 1 && people <= 30)) return { error: "Quantidade de pessoas inválida." }
   const responsible = String(input.responsible || "").trim().slice(0, 80)
   if (!responsible) return { error: "Informe o responsável pela reserva." }
 
