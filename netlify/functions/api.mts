@@ -13,7 +13,7 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 type Role = "admin" | "editor"
 
 interface Family { id: string; name: string; color: string; members: string[] }
-interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[] }
+interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxCommon?: number; maxHoliday?: number }
 interface Account { role: Role; username: string; name: string; salt: string; hash: string; updatedAt: string }
 interface Booking {
   id: string; familyId: string; responsible: string; people?: number | null; guestNames: string
@@ -25,6 +25,8 @@ interface Booking {
 const DEFAULT_CONFIG: AppConfig = {
   dailyRate: 70,
   allowOverlap: false,
+  maxCommon: 2,
+  maxHoliday: 2,
   families: [
     { id: "maria-jose", name: "Maria José", color: "#D4899A", members: ["Maria José"] },
     { id: "angela-kadar", name: "Ângela Kadar", color: "#6EA6C4", members: ["Ângela Kadar"] },
@@ -43,6 +45,31 @@ const fail = (msg: string, status = 400) => json({ error: msg }, status)
 const now = () => new Date().toISOString()
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const br = (d: string) => d.split("-").reverse().join("/")
+const pad = (n: number) => String(n).padStart(2, "0")
+const ymd = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
+/** data de hoje no horário de Brasília (AAAA-MM-DD) */
+const todayBR = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+
+/* ---------- feriados (mesma lista exibida no site) ---------- */
+function easter(y: number) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25),
+    g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4,
+    l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451)
+  return new Date(Date.UTC(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1))
+}
+const _hol: Record<number, string[]> = {}
+function holidayDates(y: number) {
+  if (_hol[y]) return _hol[y]
+  const e = easter(y)
+  const rel = (n: number) => { const d = new Date(e); d.setUTCDate(d.getUTCDate() + n); return ymd(d) }
+  const fixed = ["01-01", "01-20", "04-21", "04-23", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-24", "12-25", "12-31"]
+  return (_hol[y] = [...fixed.map((md) => `${y}-${md}`), rel(-48), rel(-47), rel(-46), rel(-2), rel(0), rel(60)])
+}
+/** a estadia inclui algum feriado entre a entrada e a saída (inclusive)? */
+function hasHoliday(a: string, b: string) {
+  for (let y = +a.slice(0, 4); y <= +b.slice(0, 4); y++) if (holidayDates(y).some((d) => d >= a && d <= b)) return true
+  return false
+}
 
 /* ---------- senhas e tokens ---------- */
 function hashPassword(password: string, salt = randomBytes(16).toString("hex")) {
@@ -127,8 +154,25 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId?: string) {
     if (!keep) return { error: `${responsible} não está entre os integrantes da família ${fam.name}. Cadastre em Ajustes → Famílias.` }
   }
 
+  const all = await listBookings()
+
+  // Regra de marcações: cada família pode ter até N marcações EM ABERTO de tempo comum
+  // e até N de feriado. Quando a estadia termina (passa o dia da saída), a vaga é liberada.
+  if (input.checkOut > todayBR()) {
+    const isHol = hasHoliday(input.checkIn, input.checkOut)
+    const limit = isHol ? cfg.maxHoliday ?? 2 : cfg.maxCommon ?? 2
+    if (limit > 0) {
+      const open = all.filter((b) => b.id !== ignoreId && b.familyId === fam.id && b.checkOut > todayBR() && hasHoliday(b.checkIn, b.checkOut) === isHol)
+      if (open.length >= limit) {
+        const kind = isHol ? "feriado" : "tempo comum"
+        const list = open.map((b) => `${br(b.checkIn)} a ${br(b.checkOut)}`).join(" e ")
+        return { error: `A família ${fam.name} já tem ${open.length} ${open.length === 1 ? "marcação" : "marcações"} de ${kind} em aberto (${list}). O limite é ${limit}. Uma nova só pode ser feita depois que uma delas terminar.` }
+      }
+    }
+  }
+
   if (!cfg.allowOverlap) {
-    const clash = (await listBookings()).find((b) => b.id !== ignoreId && input.checkIn < b.checkOut && b.checkIn < input.checkOut)
+    const clash = all.find((b) => b.id !== ignoreId && input.checkIn < b.checkOut && b.checkIn < input.checkOut)
     if (clash) {
       const f = cfg.families.find((x) => x.id === clash.familyId)
       return { error: `Conflito: o apartamento já está reservado para ${f?.name ?? "outra família"} de ${br(clash.checkIn)} a ${br(clash.checkOut)}.` }
@@ -184,7 +228,7 @@ export default async (req: Request, _context: Context) => {
       const out: any = {
         me: me ? { role: me.role, username: me.username, name: me.name } : null,
         // visitante sem login não recebe nenhum dado financeiro
-        config: me ? cfg : { allowOverlap: cfg.allowOverlap, families: cfg.families },
+        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, families: cfg.families },
         bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
       }
       if (me?.role === "admin") out.accounts = [publicAccount(me, "admin"), publicAccount(await getAccount("editor"), "editor")]
@@ -260,7 +304,11 @@ export default async (req: Request, _context: Context) => {
         color: /^#[0-9a-fA-F]{6}$/.test(f.color) ? f.color : "#888888",
         members: (Array.isArray(f.members) ? f.members : []).map((m: any) => String(m).trim().slice(0, 80)).filter(Boolean).slice(0, 60),
       }))
-      const next: AppConfig = { dailyRate: rate, allowOverlap: !!body.allowOverlap, families: clean }
+      const lim = (v: any, d: number) => { const n = Math.floor(Number(v ?? d)); return n >= 0 && n <= 50 ? n : d }
+      const next: AppConfig = {
+        dailyRate: rate, allowOverlap: !!body.allowOverlap, families: clean,
+        maxCommon: lim(body.maxCommon, cfg.maxCommon ?? 2), maxHoliday: lim(body.maxHoliday, cfg.maxHoliday ?? 2),
+      }
       await store().setJSON("config", next)
       return json(next)
     }

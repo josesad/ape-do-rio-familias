@@ -93,6 +93,17 @@ function holBetween(a,b){ /* feriados de a até b, inclusive */
 }
 const holNames=list=>[...new Set(list.map(x=>x.short))].join(", ");
 const bookingsOn=s=>S.bookings.filter(b=>b.checkIn<=s&&s<b.checkOut);
+
+/* ---------- regra de marcações ----------
+   Cada família pode ter até maxCommon marcações EM ABERTO de tempo comum e até maxHoliday
+   de feriado. A vaga é liberada quando a estadia termina (passa o dia da saída). */
+const isHolBooking=b=>holBetween(b.checkIn,b.checkOut).length>0;
+const limits=()=>({common:S.config.maxCommon??2,hol:S.config.maxHoliday??2});
+function openOf(famId,ignoreId){
+  const t=today(),bs=S.bookings.filter(b=>b.familyId===famId&&b.id!==ignoreId&&b.checkOut>t);
+  return{common:bs.filter(b=>!isHolBooking(b)),hol:bs.filter(isHolBooking)};
+}
+const quotaTxt=(n,lim)=>lim>0?`${n}/${lim}`:`${n}`;
 const yr=d=>d.getFullYear()!==new Date().getFullYear()?` ${d.getFullYear()}`:"";
 const dm=s=>{const d=parse(s);return `${d.getDate()} ${MES[d.getMonth()]}${yr(d)}`};
 const dmw=s=>{const d=parse(s);return `${SEM[d.getDay()]}, ${d.getDate()} ${MES[d.getMonth()]}${yr(d)}`};
@@ -217,9 +228,10 @@ function renderPainel(v){
       <div class="status-meta">Nenhuma estadia marcada.${canBook()?" Toque em Nova reserva para agendar.":""}</div></div></div>`;
   }
   const rows=S.config.families.map(f=>{
-    const bs=S.bookings.filter(b=>b.familyId===f.id),fb=bs.filter(b=>statusOf(b)!=="past");
+    const bs=S.bookings.filter(b=>b.familyId===f.id),o=openOf(f.id),L=limits();
+    const q=(n,lim)=>`<div class="c num ${lim>0&&n>=lim?"full":""}">${quotaTxt(n,lim)}</div>`;
     return `<div class="n" style="--fc:${f.color}"><i class="dot"></i><span>${esc(f.name)}</span></div>
-      <div class="c num">${bs.length}</div><div class="c num">${fb.length}</div><div class="c num">${bs.reduce((s,b)=>s+b.nights,0)}</div>`;
+      <div class="c num">${bs.length}</div>${q(o.common.length,L.common)}${q(o.hol.length,L.hol)}`;
   }).join("");
 
   v.innerHTML=`
@@ -236,9 +248,10 @@ function renderPainel(v){
     <section class="sec">
       <div class="sec-head"><h2>Por família</h2></div>
       <div class="card ftable">
-        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Reservas futuras</div><div class="h c">Diárias no total</div>
+        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Tempo comum em aberto</div><div class="h c">Feriados em aberto</div>
         ${rows}
       </div>
+      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().common||"∞"} marcações em aberto de tempo comum e ${limits().hol||"∞"} de feriado. A vaga é liberada quando a estadia termina.</span></p>
     </section>
     <section class="sec">
       <div class="sec-head"><h2>Próximas estadias</h2><button class="link" data-go="reservas">Ver todas ${ic("right",16)}</button></div>
@@ -386,13 +399,18 @@ function renderAdmin(v){
   const c=S.config;
   v.innerHTML=`
     <section class="sec">
-      <div class="sec-head"><h2>Cobrança</h2></div>
+      <div class="sec-head"><h2>Cobrança e regras</h2></div>
       <div class="card">
         <div class="setting">
           <label class="field"><span>Valor da diária (R$)</span><input type="number" min="0" step="1" id="cfgRate" value="${c.dailyRate}" inputmode="decimal"></label>
+          <div class="row2">
+            <label class="field"><span>Máx. em aberto: tempo comum</span><input type="number" min="0" max="50" step="1" id="cfgMaxCommon" value="${c.maxCommon??2}" inputmode="numeric"></label>
+            <label class="field"><span>Máx. em aberto: feriados</span><input type="number" min="0" max="50" step="1" id="cfgMaxHoliday" value="${c.maxHoliday??2}" inputmode="numeric"></label>
+          </div>
+          <p class="muted">Por família. Uma reserva que inclui qualquer feriado (da entrada à saída) conta como feriado. Use 0 para não limitar.</p>
           <label class="check"><input type="checkbox" id="cfgOverlap" ${c.allowOverlap?"checked":""}>Permitir duas famílias no mesmo período</label>
           <p class="muted">A nova diária vale só para reservas feitas depois da mudança.</p>
-          <button class="btn" id="saveCfg" style="align-self:flex-start">Salvar cobrança</button>
+          <button class="btn" id="saveCfg" style="align-self:flex-start">Salvar cobrança e regras</button>
         </div>
       </div>
     </section>
@@ -425,7 +443,7 @@ function renderAdmin(v){
     </section>`;
 
   $("#saveCfg").onclick=async()=>{
-    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança salva");await refresh()}catch(e){toast(e.message,"info")}
+    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),maxCommon:Number($("#cfgMaxCommon").value),maxHoliday:Number($("#cfgMaxHoliday").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança e regras salvas");await refresh()}catch(e){toast(e.message,"info")}
   };
   const readFams=()=>$$("#famEdit [data-i]").map(el=>{
     const f=S.config.families[+el.dataset.i]||{};
@@ -478,6 +496,7 @@ function openDetail(id){
       ${canSeeMoney()?row("Pagamento",b.paid?`<span class="pill ok">Pago em ${dm(b.paidAt)}</span>`:`<span class="pill warn">Pendente</span>`):""}
       ${canSeeMoney()&&b.paid&&b.paymentNote?row("Obs. do pagamento",esc(b.paymentNote)):""}
       ${row("Situação",st==="now"?"Hospedados agora":st==="past"?"Concluída":"Agendada")}
+      ${row("Tipo",isHolBooking(b)?"Feriado":"Tempo comum")}
       ${row("Feriados",esc(holBetween(b.checkIn,b.checkOut).map(x=>`${x.short} (${dm(x.date)})`).join(", ")))}
       ${row("Marcada por",esc(b.createdByName))}
     </dl>
@@ -513,7 +532,8 @@ function openBooking(b=null,startDay=null){
       <p class="req-note"><span class="req">*</span> Campos obrigatórios</p>
       <div id="bkErr" class="err hidden"></div>
       <div class="field" id="fFam"><span>Família<span class="req" aria-hidden="true">*</span></span>
-        <div class="fam-pick">${S.config.families.map(f=>`<button type="button" style="--fc:${f.color}" data-fam="${f.id}" class="${data.familyId===f.id?"on":""}"><i class="dot"></i><span>${esc(f.name)}</span></button>`).join("")}</div></div>
+        <div class="fam-pick">${S.config.families.map(f=>`<button type="button" style="--fc:${f.color}" data-fam="${f.id}" class="${data.familyId===f.id?"on":""}"><i class="dot"></i><span>${esc(f.name)}</span></button>`).join("")}</div>
+        <div class="quota hidden" id="bkQuota"></div></div>
       <div class="row2">
         <label class="field" id="fIn"><span>Entrada<span class="req" aria-hidden="true">*</span></span><input type="date" id="bkIn" value="${data.checkIn}" required aria-required="true"></label>
         <label class="field" id="fOut"><span>Saída<span class="req" aria-hidden="true">*</span></span><input type="date" id="bkOut" value="${data.checkOut}" required aria-required="true"></label>
@@ -521,6 +541,7 @@ function openBooking(b=null,startDay=null){
       <label class="field" id="fResp"><span>Responsável<span class="req" aria-hidden="true">*</span></span><select id="bkResp" required aria-required="true"></select><small class="muted" id="bkRespHint"></small></label>
       <label class="field"><span>Observações <span style="color:var(--ink-3);font-weight:500">(opcional)</span></span><textarea id="bkNotes" rows="2" placeholder="Horário de chegada, pedidos…">${esc(data.notes)}</textarea></label>
       <div class="hol-note hidden" id="bkHol"></div>
+      <div class="rule-warn hidden" id="bkRule"></div>
       <div class="total"><div><small>Valor a pagar</small><span id="bkCalc"></span></div><b class="num" id="bkTotal"></b></div>
       <button class="btn full" id="bkSave">${b?"Salvar alterações":"Confirmar reserva"}</button>
     </div>`);
@@ -545,8 +566,22 @@ function openBooking(b=null,startDay=null){
     $("#bkTotal").textContent=money(Math.max(0,n)*rate);
     const hs=n>0?holBetween($("#bkIn").value,$("#bkOut").value):[];
     $("#bkHol").classList.toggle("hidden",!hs.length);
-    $("#bkHol").innerHTML=hs.length?ic("star",18,2)+`<span>Inclui ${hs.length>1?"feriados":"feriado"}: ${esc(hs.map(x=>`${x.short} (${dm(x.date)})`).join(", "))}</span>`:""};
-  $$("[data-fam]").forEach(btn=>btn.onclick=()=>{famId=btn.dataset.fam;$("#fFam").classList.remove("invalid");$$("[data-fam]").forEach(x=>x.classList.toggle("on",x===btn));fill()});
+    $("#bkHol").innerHTML=hs.length?ic("star",18,2)+`<span>Inclui ${hs.length>1?"feriados":"feriado"}: ${esc(hs.map(x=>`${x.short} (${dm(x.date)})`).join(", "))}</span>`:"";
+    rules(n>0?(hs.length>0):null)};
+  /* vagas da família e aviso da regra de marcações */
+  const rules=isHol=>{
+    const qEl=$("#bkQuota"),wEl=$("#bkRule"),L=limits();
+    if(!famId){qEl.classList.add("hidden");wEl.classList.add("hidden");$("#bkSave").disabled=false;return}
+    const o=openOf(famId,b?.id),cf=L.common>0&&o.common.length>=L.common,hf=L.hol>0&&o.hol.length>=L.hol;
+    qEl.classList.remove("hidden");
+    qEl.innerHTML=`<span class="muted" style="align-self:center">Em aberto:</span><span class="qchip ${cf?"full":""} ${isHol===false?"cur":""}">Tempo comum ${quotaTxt(o.common.length,L.common)}</span><span class="qchip ${hf?"full":""} ${isHol===true?"cur":""}">Feriados ${quotaTxt(o.hol.length,L.hol)}</span>`;
+    const vo=$("#bkOut").value,blocked=isHol!==null&&vo>today()&&(isHol?hf:cf);
+    wEl.classList.toggle("hidden",!blocked);
+    if(blocked){const list=(isHol?o.hol:o.common).map(x=>range(x.checkIn,x.checkOut)).join(" e ");
+      wEl.innerHTML=ic("info",18,2)+`<span>A família ${esc(fam(famId).name)} já tem ${isHol?L.hol:L.common} ${isHol?"marcações de feriado":"marcações de tempo comum"} em aberto (${esc(list)}). Uma nova só pode ser feita depois que uma delas terminar.</span>`}
+    $("#bkSave").disabled=blocked;
+  };
+  $$("[data-fam]").forEach(btn=>btn.onclick=()=>{famId=btn.dataset.fam;$("#fFam").classList.remove("invalid");$$("[data-fam]").forEach(x=>x.classList.toggle("on",x===btn));fill();calc()});
   $("#bkIn").onchange=()=>{$("#fIn").classList.remove("invalid");if($("#bkIn").value&&$("#bkOut").value<=$("#bkIn").value)$("#bkOut").value=addDays($("#bkIn").value,1);calc()};
   $("#bkOut").onchange=()=>{$("#fOut").classList.remove("invalid");calc()};
   fill();calc();

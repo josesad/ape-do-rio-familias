@@ -9,6 +9,12 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - 💰 **Financeiro**: diária de R$ 70, total gerado, recebido, a receber, por família e por ano
 - ⚙️ **Admin**: valor da diária, famílias (nome, cor, integrantes) e usuários
 
+## Regras de marcação
+- Cada família pode ter até **2 marcações em aberto de tempo comum** e **2 de feriado** (ajustável em Ajustes → Cobrança e regras).
+- Uma reserva que inclui qualquer feriado (da entrada à saída) conta como feriado.
+- A vaga é liberada quando a estadia termina (passa o dia da saída).
+- A regra é verificada no servidor; o formulário mostra as vagas e avisa antes de salvar.
+
 ## Acessos
 🌐 **Link público:** qualquer pessoa com o link vê painel, calendário e reservas, sem login. Valores, diária e pagamentos (aba Financeiro) só aparecem para admin e editor — o servidor nem envia esses dados para quem não está logado.
 
