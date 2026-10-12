@@ -58,6 +58,7 @@ const IC={
   cart:'<circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M2.5 3.5H5l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.2L20.5 8H6"/>',
   tag:'<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
   box:'<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>',
+  filter:'<path d="M3.5 4.5h17l-6.5 8v6.2l-4 2.3v-8.5z"/>',
   shower:'<path d="M4 21V7a4 4 0 0 1 8 0"/><path d="M8 7h8"/><path d="M10 11v.01M13 11v.01M16 11v.01M11.5 14v.01M14.5 14v.01M13 17v.01M16 17v.01"/>',
   inbox:'<path d="M3.5 13.5 6 5h12l2.5 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/>',
 };
@@ -70,7 +71,7 @@ const EXP_DEFAULT=[
   ["ar-conserto","Conserto do ar-condicionado","Serviços","ac"],["internet-tec","Internet / TV (técnico)","Serviços","wifi"],
   ["gas-manut","Gás (manutenção)","Serviços","flame"],["aquecedor","Aquecedor","Serviços","heater"],["janelas","Janelas","Serviços","window"],
   ["encanador","Encanador / vazamento","Serviços","droplet"],["eletricista","Eletricista","Serviços","zap"],["chaveiro","Chaveiro / fechadura","Serviços","key"],
-  ["faxina","Faxina / limpeza","Serviços","sparkles"],["dedetizacao","Dedetização","Serviços","bug"],["reparo","Pequenos reparos","Serviços","wrench"],
+  ["faxina","Faxina / limpeza","Serviços","sparkles"],["dedetizacao","Dedetização","Serviços","bug"],["reparo","Pequenos reparos","Serviços","wrench"],["filtro","Troca de filtro","Serviços","filter"],
   ["ar-compra","Ar-condicionado (compra)","Compras","ac"],["microondas","Micro-ondas","Compras","microwave"],["airfryer","Air fryer","Compras","airfryer"],
   ["geladeira","Geladeira","Compras","fridge"],["fogao","Fogão","Compras","stove"],["ventilador","Ventilador","Compras","fan"],["tv","Televisão","Compras","tv"],
   ["chuveiro","Chuveiro","Compras","shower"],["copos","Copos","Compras","cup"],["pratos","Pratos","Compras","plate"],["talheres","Talheres","Compras","utensils"],
@@ -80,7 +81,7 @@ const EXP_DEFAULT=[
   ["gas-conta","Conta de gás","Contas","flame"],["iptu","IPTU","Contas","receipt"],["internet-mensal","Internet (mensalidade)","Contas","wifi"],
   ["outros","Outros","Outros","tag"],
 ].map(([id,name,group,icon])=>({id,name,group,icon}));
-const EXP_ICONS=["hammer","wrench","ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","droplet","zap","sparkles","key","bug","fan","tv","shower","cup","plate","utensils","pot","bed","spray","bulb","sofa","box","building","receipt","cart","tag"];
+const EXP_ICONS=["hammer","wrench","filter","ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","droplet","zap","sparkles","key","bug","fan","tv","shower","cup","plate","utensils","pot","bed","spray","bulb","sofa","box","building","receipt","cart","tag"];
 const expTypes=()=>[...EXP_DEFAULT,...(S.expenseTypes||[])];
 const expType=id=>expTypes().find(t=>t.id===id);
 

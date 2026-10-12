@@ -153,7 +153,7 @@ interface Expense {
   date: string; amount: number; notes: string; createdBy: string; createdByName: string; createdAt: string; updatedAt: string
 }
 const ICON_KEYS = ["ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","wrench","hammer","droplet","zap","sparkles",
-  "key","bug","fan","tv","cup","plate","utensils","pot","bed","spray","bulb","sofa","building","receipt","cart","tag","box","shower","lock"]
+  "key","bug","fan","tv","cup","plate","utensils","pot","bed","spray","bulb","sofa","building","receipt","cart","tag","box","shower","lock","filter"]
 async function listExpenses(): Promise<Expense[]> {
   const s = store()
   const { blobs } = await s.list({ prefix: "expenses/" })
