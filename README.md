@@ -17,6 +17,12 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - A regra é verificada no servidor; o formulário mostra as vagas e avisa antes de salvar.
 - **Datas passadas bloqueadas** para todos. Estadias concluídas viram histórico: não podem ser editadas; só o admin pode excluir.
 
+## Despesas
+- Aba **Despesas** visível para todos (inclusive sem login); só admin e editor lançam, editam e excluem.
+- Campos: tipo (lista com ícones — serviços, compras, contas — ou um tipo novo criado na hora), família que contratou, responsável (integrante da família), data, valor e observação.
+- O **Financeiro** mostra o **saldo atual** (recebido das reservas − despesas), o saldo previsto e o valor total das reservas.
+- Pagamentos de hospedagem: admin e editor confirmam; só o admin desfaz.
+
 ## Réveillon (Ano Novo)
 - Sequência fixa entre as famílias (padrão: Ângela → Aloísio → Maria José → Cleia → recomeça), a partir do Réveillon 2025→2026 (Ângela).
 - Só a família da vez pode marcar uma estadia que inclua a noite de 31/12. Quem não vai, perde a vez (a sequência anda todo ano).

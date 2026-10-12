@@ -144,6 +144,26 @@ function nyYearsIn(a: string, b: string) {
   return out
 }
 
+/* ---------- Despesas do apartamento ----------
+   Visíveis para todos; só admin e editor cadastram/alteram.
+   Tipos padrão ficam no site (app.js); aqui guardamos só os tipos criados pelas pessoas. */
+interface ExpenseType { id: string; name: string; group: string; icon: string; custom: true; createdBy: string }
+interface Expense {
+  id: string; typeId: string; typeName: string; icon: string; familyId: string; responsible: string
+  date: string; amount: number; notes: string; createdBy: string; createdByName: string; createdAt: string; updatedAt: string
+}
+const ICON_KEYS = ["ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","wrench","hammer","droplet","zap","sparkles",
+  "key","bug","fan","tv","cup","plate","utensils","pot","bed","spray","bulb","sofa","building","receipt","cart","tag","box","shower","lock"]
+async function listExpenses(): Promise<Expense[]> {
+  const s = store()
+  const { blobs } = await s.list({ prefix: "expenses/" })
+  const items = await Promise.all(blobs.map((b) => s.get(b.key, { type: "json" })))
+  return (items.filter(Boolean) as Expense[]).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+}
+async function getExpenseTypes(): Promise<ExpenseType[]> {
+  return ((await store().get("expense-types", { type: "json" })) as ExpenseType[] | null) ?? []
+}
+
 async function getConfig(): Promise<AppConfig> {
   return ((await store().get("config", { type: "json" })) as AppConfig | null) ?? DEFAULT_CONFIG
 }
@@ -312,6 +332,8 @@ export default async (req: Request, _context: Context) => {
         config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxTotal: cfg.maxTotal ?? 2, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, families: cfg.families },
         bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
         newYear: await getNewYear(cfg),
+        expenses: await listExpenses(),
+        expenseTypes: await getExpenseTypes(),
       }
       if (me?.role === "admin") out.accounts = [publicAccount(me, "admin"), publicAccount(await getAccount("editor"), "editor")]
       return json(out)
@@ -327,6 +349,54 @@ export default async (req: Request, _context: Context) => {
       const upd = { ...me, ...hashPassword(np), updatedAt: now() }
       await store().setJSON(`accounts/${me.role}`, upd)
       return json({ token: tokenFor(upd) })
+    }
+
+    /* Despesas: cadastrar, editar e excluir (admin e editor) */
+    if (resource === "expenses") {
+      const read = async () => {
+        const typeId = String(body.typeId || "").slice(0, 60)
+        const typeName = String(body.typeName || "").trim().slice(0, 60)
+        if (!typeId || !typeName) return { error: "Escolha o tipo de despesa." }
+        const icon = ICON_KEYS.includes(body.icon) ? body.icon : "tag"
+        const fam = cfg.families.find((f) => f.id === body.familyId)
+        if (!fam) return { error: "Escolha a família que contratou." }
+        const responsible = String(body.responsible || "").trim().slice(0, 80)
+        if (!responsible) return { error: "Selecione o responsável da família." }
+        if (!fam.members.includes(responsible)) return { error: `${responsible} não está entre os integrantes da família ${fam.name}.` }
+        if (!DATE_RE.test(body.date || "")) return { error: "Informe a data da despesa." }
+        const amount = Math.round(Number(String(body.amount).replace(",", ".")) * 100) / 100
+        if (!(amount > 0 && amount <= 1000000)) return { error: "Informe um valor maior que zero." }
+        return { data: { typeId, typeName, icon, familyId: fam.id, responsible, date: body.date, amount, notes: String(body.notes || "").trim().slice(0, 300) } }
+      }
+      if (method === "POST" && !id) {
+        const v = await read(); if (v.error) return fail(v.error)
+        const e: Expense = { id: `${Date.now().toString(36)}${randomBytes(3).toString("hex")}`, ...v.data!,
+          createdBy: me.role, createdByName: me.name, createdAt: now(), updatedAt: now() }
+        await store().setJSON(`expenses/${e.id}`, e)
+        return json(e, 201)
+      }
+      if (id) {
+        const old = (await store().get(`expenses/${id}`, { type: "json" })) as Expense | null
+        if (!old) return fail("Despesa não encontrada.", 404)
+        if (method === "PUT") {
+          const v = await read(); if (v.error) return fail(v.error)
+          const e: Expense = { ...old, ...v.data!, updatedAt: now() }
+          await store().setJSON(`expenses/${id}`, e)
+          return json(e)
+        }
+        if (method === "DELETE") { await store().delete(`expenses/${id}`); return json({ ok: true }) }
+      }
+    }
+    if (resource === "expense-types" && method === "POST" && !id) {
+      const name = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 40)
+      if (name.length < 2) return fail("Dê um nome ao tipo de despesa.")
+      const types = await getExpenseTypes()
+      if (types.some((t) => t.name.toLowerCase() === name.toLowerCase())) return fail("Já existe um tipo com esse nome.")
+      const t: ExpenseType = { id: "c-" + randomBytes(4).toString("hex"), name, custom: true, createdBy: me.name,
+        group: ["Serviços", "Compras", "Contas", "Outros"].includes(body.group) ? body.group : "Outros",
+        icon: ICON_KEYS.includes(body.icon) ? body.icon : "tag" }
+      await store().setJSON("expense-types", [...types, t])
+      return json(t, 201)
     }
 
     /* Réveillon: registrar troca (admin e editor) */
@@ -366,8 +436,9 @@ export default async (req: Request, _context: Context) => {
       if (!existing) return fail("Agendamento não encontrado.", 404)
 
       if (action === "payment" && method === "POST") {
-        if (me.role !== "admin") return fail("Só o administrador confirma pagamentos.", 403)
         const paid = !!body.paid
+        if (!paid && me.role !== "admin") return fail("Só o administrador pode desfazer um pagamento.", 403)
+        if (paid && existing.paid) return fail("Esse pagamento já foi confirmado.")
         const upd: Booking = {
           ...existing, paid,
           paidAt: paid ? (DATE_RE.test(body.paidAt || "") ? body.paidAt : now().slice(0, 10)) : null,
@@ -398,6 +469,12 @@ export default async (req: Request, _context: Context) => {
     /* ---------- só administrador ---------- */
     if (me.role !== "admin") return fail("Acesso restrito ao administrador.", 403)
 
+    if (resource === "expense-types" && id && method === "DELETE") {
+      const types = await getExpenseTypes()
+      if (!types.some((t) => t.id === id)) return fail("Tipo não encontrado.", 404)
+      await store().setJSON("expense-types", types.filter((t) => t.id !== id))
+      return json({ ok: true })
+    }
     if (resource === "newyear" && id === "swaps" && action && method === "DELETE") {
       const ny = await getNewYear(cfg)
       const s = ny.swaps.find((x) => x.id === action)

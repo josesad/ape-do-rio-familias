@@ -27,9 +27,62 @@ const IC={
   bed:'<path d="M3 18V6M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.6"/>',
   people:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
   star:'<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  /* ícones das despesas */
+  ac:'<rect x="2.5" y="5" width="19" height="9" rx="2"/><path d="M6 11h12M8 17.5l-1 2.5M12 17.5V20M16 17.5l1 2.5"/>',
+  microwave:'<rect x="2.5" y="5" width="19" height="14" rx="2"/><rect x="5.5" y="8" width="10" height="8" rx="1"/><path d="M18.5 9v.01M18.5 12v.01M18.5 15v.01"/>',
+  airfryer:'<path d="M7.5 4h9A2.5 2.5 0 0 1 19 6.5V18a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V6.5A2.5 2.5 0 0 1 7.5 4z"/><path d="M5 10h14M10 14.5h4"/><circle cx="12" cy="7" r=".8"/>',
+  fridge:'<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M5 10h14M8.5 6v1.5M8.5 13v3"/>',
+  stove:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16"/><circle cx="8.5" cy="6" r=".9"/><circle cx="15.5" cy="6" r=".9"/><rect x="7.5" y="12" width="9" height="6" rx="1"/>',
+  flame:'<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.4 1.2-3.9 2.5-5 .3 1.6 1.2 2.6 2.3 2.6C11 8 11 5.5 12 3z"/>',
+  heater:'<rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 4v12M12 4v12M16 4v12M7 16v3.5M17 16v3.5"/>',
+  window:'<rect x="4" y="3.5" width="16" height="17" rx="1.5"/><path d="M12 3.5v17M4 12h16"/>',
+  wifi:'<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r=".9"/>',
+  wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a5.5 5.5 0 0 1-7.3 7.3l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a5.5 5.5 0 0 1 7.3-7.3z"/>',
+  hammer:'<path d="m14 11-8.6 8.6a1.9 1.9 0 0 1-2.7-2.7L11.3 8.3"/><path d="m9.5 6.5 3-3a2 2 0 0 1 2.8 0l5.2 5.2a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0z"/>',
+  droplet:'<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11z"/>',
+  zap:'<path d="M13 2.5 4.5 13.5H12l-1 8 8.5-11H12z"/>',
+  sparkles:'<path d="M11 3l1.8 4.7 4.7 1.8-4.7 1.8L11 16l-1.8-4.7L4.5 9.5l4.7-1.8z"/><path d="M18.5 14.5v5M16 17h5"/>',
+  key:'<circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3M16.5 6.5 19 9M14 9l2 2"/>',
+  bug:'<rect x="8" y="7" width="8" height="13" rx="4"/><path d="M12 7V5M9.5 4 10.5 6M14.5 4l-1 2M8 11H4.5M8 15H5M16 11h3.5M16 15h3M12 11v9"/>',
+  fan:'<circle cx="12" cy="10" r="1.6"/><path d="M12 8.4C12 5 13 2.8 15.3 3.2s.9 4.5-2 5.9M13.4 11.2c3 1.4 4.8 3.3 3.4 5.2s-4.3-1.1-4.7-4.3M10.6 10.9C7.6 12 5 11.7 4.8 9.4s4.1-2.4 5.9-.4"/><path d="M12 12v9M8.5 21h7"/>',
+  tv:'<rect x="2.5" y="5" width="19" height="13" rx="2"/><path d="M8 21h8M12 18v3"/>',
+  cup:'<path d="M6 3h12l-1.6 16.6A1.6 1.6 0 0 1 14.8 21H9.2a1.6 1.6 0 0 1-1.6-1.4z"/><path d="M6.6 9h10.8"/>',
+  plate:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/>',
+  utensils:'<path d="M6 3v6a2 2 0 0 0 4 0V3M8 3v18"/><path d="M18 21V3c-2.2 1.3-3.5 4-3.5 7.5V13H18"/>',
+  pot:'<path d="M4 10h16v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M2 10h2M20 10h2M9 7c0-1.5 1.3-2.5 3-2.5s3 1 3 2.5"/>',
+  spray:'<path d="M8 9h6v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z"/><path d="M9 9V6h4v3M13 6h3l2-2M17.5 8.5h2.5M17.5 11.5H20"/>',
+  bulb:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+  sofa:'<path d="M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M6 18v2M18 18v2"/>',
+  building:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h.01M12 7h.01M15 7h.01M9 11h.01M12 11h.01M15 11h.01M9 15h.01M15 15h.01M11 21v-4h2v4"/>',
+  receipt:'<path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  cart:'<circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M2.5 3.5H5l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.2L20.5 8H6"/>',
+  tag:'<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
+  box:'<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>',
+  shower:'<path d="M4 21V7a4 4 0 0 1 8 0"/><path d="M8 7h8"/><path d="M10 11v.01M13 11v.01M16 11v.01M11.5 14v.01M14.5 14v.01M13 17v.01M16 17v.01"/>',
   inbox:'<path d="M3.5 13.5 6 5h12l2.5 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/>',
 };
 const ic=(n,s=20,w=1.8)=>`<svg class="i" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
+
+/* ---------- tipos de despesa (padrão) ---------- */
+const EXP_GROUPS=["Serviços","Compras","Contas","Outros"];
+const EXP_DEFAULT=[
+  ["maodeobra","Mão de obra de terceiros","Serviços","hammer"],["ar-limpeza","Limpeza do ar-condicionado","Serviços","ac"],
+  ["ar-conserto","Conserto do ar-condicionado","Serviços","ac"],["internet-tec","Internet / TV (técnico)","Serviços","wifi"],
+  ["gas-manut","Gás (manutenção)","Serviços","flame"],["aquecedor","Aquecedor","Serviços","heater"],["janelas","Janelas","Serviços","window"],
+  ["encanador","Encanador / vazamento","Serviços","droplet"],["eletricista","Eletricista","Serviços","zap"],["chaveiro","Chaveiro / fechadura","Serviços","key"],
+  ["faxina","Faxina / limpeza","Serviços","sparkles"],["dedetizacao","Dedetização","Serviços","bug"],["reparo","Pequenos reparos","Serviços","wrench"],
+  ["ar-compra","Ar-condicionado (compra)","Compras","ac"],["microondas","Micro-ondas","Compras","microwave"],["airfryer","Air fryer","Compras","airfryer"],
+  ["geladeira","Geladeira","Compras","fridge"],["fogao","Fogão","Compras","stove"],["ventilador","Ventilador","Compras","fan"],["tv","Televisão","Compras","tv"],
+  ["chuveiro","Chuveiro","Compras","shower"],["copos","Copos","Compras","cup"],["pratos","Pratos","Compras","plate"],["talheres","Talheres","Compras","utensils"],
+  ["panelas","Panelas","Compras","pot"],["cama-banho","Roupa de cama e banho","Compras","bed"],["prod-limpeza","Produtos de limpeza","Compras","spray"],
+  ["lampadas","Lâmpadas","Compras","bulb"],["moveis","Móveis","Compras","sofa"],["utilidades","Utilidades da casa","Compras","box"],
+  ["condominio","Condomínio","Contas","building"],["luz","Conta de luz","Contas","zap"],["agua","Conta de água","Contas","droplet"],
+  ["gas-conta","Conta de gás","Contas","flame"],["iptu","IPTU","Contas","receipt"],["internet-mensal","Internet (mensalidade)","Contas","wifi"],
+  ["outros","Outros","Outros","tag"],
+].map(([id,name,group,icon])=>({id,name,group,icon}));
+const EXP_ICONS=["hammer","wrench","ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","droplet","zap","sparkles","key","bug","fan","tv","shower","cup","plate","utensils","pot","bed","spray","bulb","sofa","box","building","receipt","cart","tag"];
+const expTypes=()=>[...EXP_DEFAULT,...(S.expenseTypes||[])];
+const expType=id=>expTypes().find(t=>t.id===id);
 
 /* paleta suave para as famílias */
 const PALETTE=["#D4899A","#6EA6C4","#D3A867","#9A8DCB","#7DAF8E","#DB9478","#5FADA8","#8F9DB2"];
@@ -235,7 +288,7 @@ async function api(path,opts={}){
 function setToken(t){S.token=t;store.set("apto_token",t)}
 async function load(){
   const d=await api("state");
-  S.me=d.me;S.config=d.config;S.bookings=d.bookings;S.accounts=d.accounts||[];S.newYear=d.newYear||null;
+  S.me=d.me;S.config=d.config;S.bookings=d.bookings;S.accounts=d.accounts||[];S.newYear=d.newYear||null;S.expenses=d.expenses||[];S.expenseTypes=d.expenseTypes||[];
   if(S.token&&!S.me) setToken(null);
 }
 async function refresh(){try{await load();render()}catch(e){}}
@@ -243,20 +296,22 @@ async function refresh(){try{await load();render()}catch(e){}}
 /* =========================================================
    Estrutura geral
    ========================================================= */
-const TABS=[["painel","grid","Painel"],["calendario","cal","Calendário"],["reservas","list","Reservas"],["financeiro","wallet","Financeiro"],["admin","sliders","Ajustes"]];
+const TABS=[["painel","grid","Painel"],["calendario","cal","Calendário"],["reservas","list","Reservas"],["despesas","receipt","Despesas"],["financeiro","wallet","Financeiro"],["admin","sliders","Ajustes"]];
 $("#brandMark").innerHTML=ic("logo",22,2);
 function render(){
   if(S.tab==="admin"&&!isAdmin()) S.tab="painel";
   if(S.tab==="financeiro"&&!canSeeMoney()) S.tab="painel";
   $("#meBtn").innerHTML=S.me?`<span class="av">${esc(initials(S.me.name))}</span><span>${esc(S.me.name.split(" ")[0])}</span>`:`${ic("login",18)}<span>Entrar</span>`;
   $("#roleLabel").textContent=S.me?`Conectado como ${ROLE_NAME[S.me.role].toLowerCase()}`:"Agenda das famílias";
-  $("#tabs").innerHTML=TABS.filter(([k])=>(k!=="admin"||isAdmin())&&(k!=="financeiro"||canSeeMoney())).map(([k,i,l])=>`<button data-tab="${k}" class="${S.tab===k?"on":""}">${ic(i,22)}<span>${l}</span></button>`).join("");
-  $("#fab").innerHTML=ic("plus",20,2.2)+"<span>Nova reserva</span>";
+  const tabs=TABS.filter(([k])=>(k!=="admin"||isAdmin())&&(k!=="financeiro"||canSeeMoney()));
+  $("#tabs").classList.toggle("n6",tabs.length>=6);
+  $("#tabs").innerHTML=tabs.map(([k,i,l])=>`<button data-tab="${k}" class="${S.tab===k?"on":""}">${ic(i,22)}<span>${l}</span></button>`).join("");
+  $("#fab").innerHTML=ic("plus",20,2.2)+`<span>${S.tab==="despesas"?"Nova despesa":"Nova reserva"}</span>`;
   $("#fab").classList.toggle("hidden",!canBook()||S.tab==="admin");
-  ({painel:renderPainel,calendario:renderCalendario,reservas:renderReservas,financeiro:renderFinanceiro,admin:renderAdmin})[S.tab]($("#view"));
+  ({painel:renderPainel,calendario:renderCalendario,reservas:renderReservas,despesas:renderDespesas,financeiro:renderFinanceiro,admin:renderAdmin})[S.tab]($("#view"));
 }
 $("#tabs").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(!b)return;S.tab=b.dataset.tab;store.set("apto_tab",S.tab);render();window.scrollTo({top:0})});
-$("#fab").onclick=()=>openBooking();
+$("#fab").onclick=()=>S.tab==="despesas"?openExpense():openBooking();
 $("#meBtn").onclick=()=>S.me?openMe():openLogin();
 
 /* ---------- item de reserva ---------- */
@@ -446,16 +501,28 @@ function renderReservas(v){
    Financeiro
    ========================================================= */
 function renderFinanceiro(v){
-  const years=[...new Set(S.bookings.map(b=>b.checkIn.slice(0,4)))].sort();
+  const years=[...new Set([...S.bookings.map(b=>b.checkIn.slice(0,4)),...(S.expenses||[]).map(e=>e.date.slice(0,4))])].sort();
   const bs=S.finYear==="todos"?S.bookings:S.bookings.filter(b=>b.checkIn.startsWith(S.finYear));
+  const ex=S.finYear==="todos"?(S.expenses||[]):(S.expenses||[]).filter(e=>e.date.startsWith(S.finYear));
   const total=bs.reduce((s,b)=>s+b.amount,0),pago=bs.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
+  const desp=ex.reduce((s,e)=>s+e.amount,0),saldo=pago-desp,previsto=total-desp;
   const pend=bs.filter(b=>!b.paid);
   const pct=total?Math.round(pago/total*100):0;
   v.innerHTML=`
     <div class="chips">${["todos",...years].map(y=>`<button class="chip ${S.finYear===y?"on":""}" data-fy="${y}">${y==="todos"?"Todos os anos":y}</button>`).join("")}</div>
+    <div class="card saldo">
+      <div class="fin-total">
+        <div><div class="eyebrow">Saldo atual</div><div class="big num ${saldo<0?"neg":"pos"}">${money(saldo)}</div><div class="muted">Recebido das reservas menos as despesas</div></div>
+        <div class="saldo-grid">
+          <div><span class="lbl">${ic("wallet",15)}Recebido</span><b class="num" style="color:var(--ok)">${money(pago)}</b></div>
+          <div><span class="lbl">${ic("receipt",15)}Despesas</span><b class="num" style="color:var(--bad)">− ${money(desp)}</b></div>
+        </div>
+      </div>
+      <div class="rate-line" style="border-top:1px solid var(--line-2)">${ic("info",18)}<span>Saldo previsto, se todas as reservas forem pagas: <b class="num">${money(previsto)}</b></span></div>
+    </div>
     <div class="card">
       <div class="fin-total">
-        <div><div class="eyebrow">Total das reservas</div><div class="big num">${money(total)}</div><div class="muted">${plural(bs.length,"reserva")} · ${plural(bs.reduce((s,b)=>s+b.nights,0),"diária")}</div></div>
+        <div><div class="eyebrow">Valor total das reservas</div><div class="big num">${money(total)}</div><div class="muted">${plural(bs.length,"reserva")} · ${plural(bs.reduce((s,b)=>s+b.nights,0),"diária")}</div></div>
         <div class="prog" title="${pct}% recebido"><i style="width:${pct}%"></i></div>
         <div class="fin-split">
           <div><span class="lbl"><i style="background:var(--ok)"></i>Recebido</span><b class="num" style="color:var(--ok)">${money(pago)}</b></div>
@@ -477,10 +544,150 @@ function renderFinanceiro(v){
     <section class="sec">
       <div class="sec-head"><h2>Pagamentos pendentes</h2><span class="muted">${plural(pend.length,"reserva")}</span></div>
       ${listOf(pend,"Tudo pago. Nenhuma pendência.","check")}
-      ${S.me&&!isAdmin()?`<p class="muted" style="display:flex;gap:6px;align-items:center">${ic("info",16)}Pagamentos são confirmados pelo administrador.</p>`:""}
     </section>`;
   $$("[data-fy]",v).forEach(b=>b.onclick=()=>{S.finYear=b.dataset.fy;render()});
+  $$("[data-go]",v).forEach(b=>b.onclick=()=>{S.tab=b.dataset.go;render();window.scrollTo({top:0})});
   bindItems(v);
+}
+
+/* =========================================================
+   Despesas (visível para todos; admin e editor cadastram)
+   ========================================================= */
+function expItem(e){
+  const f=fam(e.familyId),t=expType(e.typeId);
+  return `<button class="bk ex" data-exp="${e.id}">
+    <span class="ex-ic">${ic(t?.icon||e.icon||"tag",22)}</span>
+    <span class="bk-main">
+      <span class="bk-fam"><span>${esc(e.typeName)}</span></span>
+      <span class="bk-sub"><i class="dot" style="--fc:${f.color};display:inline-block;margin-right:5px;vertical-align:1px"></i>${esc(f.name)} · ${esc(e.responsible)}</span>
+      <span class="bk-sub">${dmw(e.date)}${e.notes?" · "+esc(e.notes):""}</span>
+    </span>
+    <span class="bk-side"><b class="num">${money(e.amount)}</b></span>
+  </button>`;
+}
+function renderDespesas(v){
+  S.expYear=S.expYear||"todos";
+  const all=S.expenses||[],years=[...new Set(all.map(e=>e.date.slice(0,4)))].sort();
+  const ex=S.expYear==="todos"?all:all.filter(e=>e.date.startsWith(S.expYear));
+  const total=ex.reduce((s,e)=>s+e.amount,0);
+  const byGroup=EXP_GROUPS.map(g=>[g,ex.filter(e=>(expType(e.typeId)?.group||"Outros")===g).reduce((s,e)=>s+e.amount,0)]);
+  const GI={Serviços:"hammer",Compras:"cart",Contas:"receipt",Outros:"tag"};
+  v.innerHTML=`
+    ${years.length>1?`<div class="chips">${["todos",...years].map(y=>`<button class="chip ${S.expYear===y?"on":""}" data-ey="${y}">${y==="todos"?"Todos os anos":y}</button>`).join("")}</div>`:""}
+    <div class="card">
+      <div class="fin-total">
+        <div><div class="eyebrow">Total de despesas</div><div class="big num">${money(total)}</div><div class="muted">${plural(ex.length,"despesa")} com reparos, compras e contas do apartamento</div></div>
+        <div class="exp-groups">${byGroup.map(([g,s])=>`<div><span class="lbl">${ic(GI[g],15)}${g}</span><b class="num">${money(s)}</b></div>`).join("")}</div>
+      </div>
+    </div>
+    <section class="sec">
+      <div class="sec-head"><h2>Lançamentos</h2><span class="muted">${plural(ex.length,"despesa")}</span></div>
+      ${ex.length?`<div class="list card">${ex.map(expItem).join("")}</div>`
+        :`<div class="card empty"><span class="ei">${ic("receipt",22)}</span>Nenhuma despesa registrada.${S.me?"<br>Toque em Nova despesa para lançar a primeira.":""}</div>`}
+    </section>`;
+  $$("[data-ey]",v).forEach(b=>b.onclick=()=>{S.expYear=b.dataset.ey;render()});
+  $$("[data-exp]",v).forEach(b=>b.onclick=()=>openExpenseDetail(b.dataset.exp));
+}
+function openExpenseDetail(id){
+  const e=(S.expenses||[]).find(x=>x.id===id);if(!e)return;
+  const f=fam(e.familyId),t=expType(e.typeId);
+  const row=(k,val)=>val?`<div><dt>${k}</dt><dd>${val}</dd></div>`:"";
+  openSheet(`${sheetHead(`<span class="sheet-fam"><span class="ex-ic sm">${ic(t?.icon||e.icon||"tag",18)}</span>${esc(e.typeName)}</span>`)}
+    <dl class="dl">
+      ${row("Valor",`<span class="num">${money(e.amount)}</span>`)}
+      ${row("Data",dmw(e.date))}
+      ${row("Categoria",esc(t?.group||"Outros"))}
+      ${row("Família que contratou",`<span style="display:inline-flex;align-items:center;gap:6px"><i class="dot" style="--fc:${f.color}"></i>${esc(f.name)}</span>`)}
+      ${row("Responsável",esc(e.responsible))}
+      ${row("Observação",esc(e.notes))}
+      ${row("Lançada por",esc(e.createdByName))}
+    </dl>
+    ${S.me?`<div class="actions"><button class="btn ghost" id="eEdit">${ic("edit",18)}Editar</button><button class="btn danger" id="eDel">${ic("trash",18)}Excluir</button></div>`:""}`);
+  if($("#eEdit")) $("#eEdit").onclick=()=>openExpense(e);
+  if($("#eDel")) armConfirm($("#eDel"),"Confirmar",async()=>{
+    try{await api("expenses/"+e.id,{method:"DELETE"});closeSheet();toast("Despesa excluída");await refresh()}catch(err){toast(err.message,"info")}
+  });
+}
+function parseMoney(s){s=String(s||"").trim().replace(/[^\d.,]/g,"");if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");const n=parseFloat(s);return isFinite(n)?Math.round(n*100)/100:NaN}
+function openExpense(e=null){
+  const d=e?{...e}:{typeId:"",familyId:"",responsible:"",date:today(),amount:"",notes:""};
+  let typeId=d.typeId,famId=d.familyId,respSel=d.responsible;
+  openSheet(`${sheetHead(e?"Editar despesa":"Nova despesa")}
+    <div class="form">
+      <div id="exErr" class="err hidden"></div>
+      <div class="field" id="fxType"><span>Tipo de despesa</span>
+        <button type="button" class="type-btn" id="exTypeBtn"></button>
+        <div class="type-panel hidden" id="exTypePanel">
+          <input id="exTypeSearch" placeholder="Buscar tipo (ex.: micro-ondas)" autocomplete="off">
+          <div id="exTypeList"></div>
+          <div class="box hidden" id="exNewType">
+            <h4>${ic("plus",18)}Criar tipo de despesa</h4>
+            <label class="field"><span>Nome</span><input id="ntName" placeholder="Ex.: Inseticida" maxlength="40"></label>
+            <label class="field"><span>Categoria</span><select id="ntGroup">${EXP_GROUPS.map(g=>`<option ${g==="Compras"?"selected":""}>${g}</option>`).join("")}</select></label>
+            <div class="field"><span>Ícone</span><div class="icon-pick" id="ntIcons">${EXP_ICONS.map((k,i)=>`<button type="button" data-nti="${k}" class="${k==="tag"?"on":""}" aria-label="${k}">${ic(k,18)}</button>`).join("")}</div></div>
+            <div class="actions"><button type="button" class="btn ghost" id="ntCancel">Cancelar</button><button type="button" class="btn" id="ntSave">Criar tipo</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="field" id="fxFam"><span>Família que contratou</span>
+        <div class="fam-pick">${S.config.families.map(f=>`<button type="button" style="--fc:${f.color}" data-xfam="${f.id}" class="${famId===f.id?"on":""}"><i class="dot"></i><span>${esc(f.name)}</span></button>`).join("")}</div></div>
+      <label class="field" id="fxResp"><span>Responsável</span><select id="exResp"></select></label>
+      <div class="row2">
+        <label class="field" id="fxDate"><span>Data</span><input type="date" id="exDate" value="${d.date}"></label>
+        <label class="field" id="fxAmt"><span>Valor</span><div class="money-in"><span>R$</span><input id="exAmount" inputmode="decimal" placeholder="0,00" value="${d.amount!==""?String(d.amount).replace(".",","):""}"></div></label>
+      </div>
+      <label class="field"><span>Observação <span style="color:var(--ink-3);font-weight:500">(opcional)</span></span><input id="exNotes" maxlength="300" placeholder="Ex.: troca do filtro, 2 aparelhos" value="${esc(d.notes)}"></label>
+      <button class="btn full" id="exSave">${e?"Salvar alterações":"Lançar despesa"}</button>
+    </div>`);
+  const drawTypeBtn=()=>{const t=expType(typeId)||(e&&e.typeId===typeId?{name:e.typeName,icon:e.icon,group:""}:null);
+    $("#exTypeBtn").innerHTML=t?`<span class="ex-ic sm">${ic(t.icon||"tag",18)}</span><span style="flex:1;text-align:left">${esc(t.name)}</span><span class="muted">Trocar</span>`
+      :`<span class="ex-ic sm">${ic("tag",18)}</span><span style="flex:1;text-align:left;color:var(--ink-3)">Escolha o tipo</span>${ic("right",16)}`};
+  const drawTypes=()=>{const q=$("#exTypeSearch").value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const norm=s=>s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const list=expTypes().filter(t=>!q||norm(t.name).includes(q));
+    $("#exTypeList").innerHTML=EXP_GROUPS.map(g=>{const ts=list.filter(t=>t.group===g);return ts.length?`<div class="type-group">${g}</div><div class="type-grid">${ts.map(t=>`<button type="button" class="type-tile ${t.id===typeId?"on":""}" data-tid="${t.id}">${ic(t.icon,22)}<span>${esc(t.name)}</span></button>`).join("")}</div>`:""}).join("")
+      +`<div class="type-grid" style="margin-top:8px"><button type="button" class="type-tile new" id="exNewBtn">${ic("plus",22)}<span>Criar novo tipo</span></button></div>`
+      +(list.length?"":`<p class="muted" style="text-align:center;padding:6px 0">Nenhum tipo encontrado. Crie um novo.</p>`);
+    $$("[data-tid]").forEach(b=>b.onclick=()=>{typeId=b.dataset.tid;$("#fxType").classList.remove("invalid");$("#exTypePanel").classList.add("hidden");drawTypeBtn()});
+    $("#exNewBtn").onclick=()=>{$("#exNewType").classList.remove("hidden");$("#ntName").value=$("#exTypeSearch").value.trim();$("#ntName").focus()};
+  };
+  $("#exTypeBtn").onclick=()=>{$("#exTypePanel").classList.toggle("hidden");drawTypes()};
+  $("#exTypeSearch").oninput=drawTypes;
+  let ntIcon="tag";
+  $$("[data-nti]").forEach(b=>b.onclick=()=>{ntIcon=b.dataset.nti;$$("[data-nti]").forEach(x=>x.classList.toggle("on",x===b))});
+  $("#ntCancel").onclick=()=>$("#exNewType").classList.add("hidden");
+  $("#ntSave").onclick=async()=>{
+    try{const t=await api("expense-types",{method:"POST",body:{name:$("#ntName").value,group:$("#ntGroup").value,icon:ntIcon}});
+      S.expenseTypes=[...(S.expenseTypes||[]),t];typeId=t.id;$("#exNewType").classList.add("hidden");$("#exTypePanel").classList.add("hidden");
+      $("#fxType").classList.remove("invalid");drawTypeBtn();toast("Tipo criado")}
+    catch(err){$("#exErr").textContent=err.message;$("#exErr").classList.remove("hidden")}
+  };
+  const fillResp=()=>{const sel=$("#exResp");
+    if(!famId){sel.innerHTML=`<option value="">Escolha a família primeiro</option>`;sel.disabled=true;return}
+    const m=fam(famId).members,legacy=e&&e.familyId===famId&&!m.includes(e.responsible)?e.responsible:null;
+    sel.disabled=false;sel.innerHTML=`<option value="">Selecione o responsável</option>`+m.map(x=>`<option>${esc(x)}</option>`).join("")+(legacy?`<option>${esc(legacy)}</option>`:"");
+    sel.value=m.includes(respSel)||respSel===legacy?respSel:(m.length===1?m[0]:"");respSel=sel.value};
+  $$("[data-xfam]").forEach(b=>b.onclick=()=>{famId=b.dataset.xfam;$("#fxFam").classList.remove("invalid");$$("[data-xfam]").forEach(x=>x.classList.toggle("on",x===b));fillResp()});
+  $("#exResp").onchange=ev=>{respSel=ev.target.value;$("#fxResp").classList.remove("invalid")};
+  $("#exDate").onchange=()=>$("#fxDate").classList.remove("invalid");
+  $("#exAmount").oninput=()=>$("#fxAmt").classList.remove("invalid");
+  drawTypeBtn();fillResp();if(!typeId){$("#exTypePanel").classList.remove("hidden");drawTypes()}
+  $("#exSave").onclick=async()=>{
+    const btn=$("#exSave");btn.disabled=true;$("#exErr").classList.add("hidden");$$(".field.invalid").forEach(x=>x.classList.remove("invalid"));
+    const t=expType(typeId)||(e&&e.typeId===typeId?{id:e.typeId,name:e.typeName,icon:e.icon}:null),amount=parseMoney($("#exAmount").value);
+    const miss=[];
+    if(!t){miss.push("tipo");$("#fxType").classList.add("invalid")}
+    if(!famId){miss.push("família");$("#fxFam").classList.add("invalid")}
+    if(!$("#exResp").value){miss.push("responsável");$("#fxResp").classList.add("invalid")}
+    if(!$("#exDate").value){miss.push("data");$("#fxDate").classList.add("invalid")}
+    if(!(amount>0)){miss.push("valor");$("#fxAmt").classList.add("invalid")}
+    try{
+      if(miss.length) throw new Error(`Preencha: ${miss.join(", ")}.`);
+      const body={typeId:t.id,typeName:t.name,icon:t.icon,familyId:famId,responsible:$("#exResp").value,date:$("#exDate").value,amount,notes:$("#exNotes").value};
+      if(e) await api("expenses/"+e.id,{method:"PUT",body}); else await api("expenses",{method:"POST",body});
+      closeSheet();toast(e?"Despesa atualizada":"Despesa lançada");S.tab="despesas";await refresh();
+    }catch(err){$("#exErr").textContent=err.message;$("#exErr").classList.remove("hidden");$(".sheet").scrollTo({top:0,behavior:"smooth"});btn.disabled=false}
+  };
 }
 
 /* =========================================================
@@ -544,6 +751,13 @@ function renderAdmin(v){
         <button class="btn" id="saveNY" style="align-self:flex-start">Salvar sequência</button>
       </div></div>
     </section>
+    ${(S.expenseTypes||[]).length?`<section class="sec">
+      <div class="sec-head"><h2>Tipos de despesa criados</h2></div>
+      <div class="card">${S.expenseTypes.map(t=>`<div class="acc-row"><span class="ex-ic">${ic(t.icon,20)}</span>
+        <div class="acc-main"><b>${esc(t.name)}</b><span>${esc(t.group)}${t.createdBy?" · criado por "+esc(t.createdBy):""}</span></div>
+        <button class="btn danger sm" data-deltype="${t.id}" aria-label="Excluir tipo">${ic("trash",16)}</button></div>`).join("")}</div>
+      <p class="muted">Excluir um tipo não apaga as despesas já lançadas com ele.</p>
+    </section>`:""}
     <section class="sec">
       <div class="sec-head"><h2>Logins</h2></div>
       <div class="card">
@@ -586,6 +800,9 @@ function renderAdmin(v){
     armConfirm(b,"",()=>{const fs=readFams();fs.splice(i,1);S.config.families=fs;S.famTab=Math.max(0,i-1);render();toast("Toque em Salvar famílias para confirmar","info")});
   });
   $$("[data-acc]",v).forEach(b=>b.onclick=()=>openAccount(S.accounts.find(a=>a.role===b.dataset.acc)));
+  $$("[data-deltype]",v).forEach(b=>armConfirm(b,"",async()=>{
+    try{await api("expense-types/"+b.dataset.deltype,{method:"DELETE"});toast("Tipo excluído");await refresh()}catch(e){toast(e.message,"info")}
+  }));
   /* sequência do Réveillon */
   const ord=()=>$$("#nyOrder [data-id]").map(x=>x.dataset.id);
   const mv=(i,d)=>{const o=ord();[o[i],o[i+d]]=[o[i+d],o[i]];S.newYear={...NY(),order:o};render()};
@@ -634,7 +851,7 @@ function openDetail(id){
       ${row("Feriados",esc(holBetween(b.checkIn,b.checkOut).map(x=>`${x.short} (${dm(x.date)})`).join(", ")))}
       ${row("Marcada por",esc(b.createdByName))}
     </dl>
-    ${isAdmin()?(b.paid?`<button class="btn ghost full" id="payUndo">${ic("undo",18)}Desfazer pagamento</button>`:`
+    ${S.me?(b.paid?(isAdmin()?`<button class="btn ghost full" id="payUndo">${ic("undo",18)}Desfazer pagamento</button>`:""):`
       <div class="box"><h4>${ic("wallet",18)}Registrar pagamento</h4>
         <div class="row2">
           <label class="field"><span>Data</span><input type="date" id="payDate" value="${today()}"></label>
