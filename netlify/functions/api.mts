@@ -20,7 +20,11 @@ interface Booking {
   checkIn: string; checkOut: string; nights: number; rate: number; amount: number
   paid: boolean; paidAt: string | null; paymentNote: string; notes: string
   createdBy: string; createdByName: string; createdAt: string; updatedAt: string
+  /** cancelada com menos de 15 dias: sai do calendário, mas a família paga as diárias */
+  cancelled?: boolean; cancelledAt?: string; cancelledBy?: string; cancelDays?: number
 }
+/** cancelamento sem custo só com esta antecedência (em dias) ou mais */
+const CANCEL_FREE_DAYS = 15
 
 const DEFAULT_CONFIG: AppConfig = {
   dailyRate: 70,
@@ -176,6 +180,8 @@ async function listBookings(): Promise<Booking[]> {
   const items = await Promise.all(blobs.map((b) => s.get(b.key, { type: "json" })))
   return (items.filter(Boolean) as Booking[]).sort((a, b) => a.checkIn.localeCompare(b.checkIn))
 }
+/** reservas que ocupam o apartamento (sem as canceladas) */
+const activeBookings = async () => (await listBookings()).filter((b) => !b.cancelled)
 const publicAccount = (a: Account | null, role: Role) =>
   a ? { role, username: a.username, name: a.name, active: true } : { role, username: SEED[role].username, name: SEED[role].name, active: false }
 
@@ -232,7 +238,7 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | un
     if (!keep) return { error: `${responsible} não está entre os integrantes da família ${fam.name}. Cadastre em Ajustes → Famílias.` }
   }
 
-  const all = await listBookings()
+  const all = await activeBookings()
 
   // Réveillon: só a família da vez (pela sequência + trocas) pode marcar a noite de 31/12
   {
@@ -408,7 +414,7 @@ export default async (req: Request, _context: Context) => {
       if (a === b) return fail("Escolha dois anos diferentes.")
       const owners = nyOwners(ny, [a, b])
       if (owners[a] === owners[b]) return fail("Esses dois anos já são da mesma família.")
-      const booked = (await listBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === a || y === b))
+      const booked = (await activeBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === a || y === b))
       if (booked) return fail(`Já existe reserva no Réveillon ${nyYearsIn(booked.checkIn, booked.checkOut)[0]}. Cancele a reserva antes de registrar a troca.`)
       const swap: Swap = { id: randomBytes(4).toString("hex"), a: Math.min(a, b), b: Math.max(a, b),
         famA: owners[Math.min(a, b)], famB: owners[Math.max(a, b)], by: me.name, at: now() }
@@ -449,7 +455,29 @@ export default async (req: Request, _context: Context) => {
       }
       // estadias que já terminaram ficam travadas (histórico)
       const finished = existing.checkOut <= todayBR()
+
+      /* Cancelamento:
+         - com 15 dias ou mais antes da entrada → sem custo (a reserva é removida);
+         - com menos de 15 dias (ou já em andamento) → a reserva sai do calendário,
+           mas a família paga todas as diárias, como se tivesse ido (fica pendente no financeiro). */
+      if (action === "cancel" && method === "POST") {
+        if (existing.cancelled) return fail("Essa reserva já foi cancelada.")
+        if (finished) return fail("Essa estadia já terminou e não pode ser cancelada.", 403)
+        const days = nightsBetween(todayBR(), existing.checkIn)
+        if (days >= CANCEL_FREE_DAYS) {
+          if (existing.paid && me.role !== "admin")
+            return fail("Reserva já paga: só o administrador pode cancelar sem custo (para devolver o valor).", 403)
+          await store().delete(`bookings/${id}`)
+          return json({ ok: true, free: true, days })
+        }
+        const upd: Booking = { ...existing, cancelled: true, cancelledAt: now(), cancelledBy: me.name,
+          cancelDays: Math.max(0, days), updatedAt: now() }
+        await store().setJSON(`bookings/${id}`, upd)
+        return json({ ok: true, free: false, days, booking: upd })
+      }
+
       if (method === "PUT") {
+        if (existing.cancelled) return fail("Essa reserva foi cancelada e não pode ser alterada.", 403)
         if (finished) return fail("Essa estadia já terminou e não pode ser alterada.", 403)
         const v = await validateBooking(body, cfg, id, me.role)
         if (v.error) return fail(v.error)
@@ -458,9 +486,9 @@ export default async (req: Request, _context: Context) => {
         await store().setJSON(`bookings/${id}`, upd)
         return json(upd)
       }
+      // excluir de vez (sem regra de cancelamento): só o administrador
       if (method === "DELETE") {
-        if (finished && me.role !== "admin") return fail("Essa estadia já terminou: só o administrador pode excluir.", 403)
-        if (existing.paid && me.role !== "admin") return fail("Reserva já paga: só o administrador pode cancelar.", 403)
+        if (me.role !== "admin") return fail("Para cancelar, use o botão Cancelar (segue a regra dos 15 dias). Só o administrador exclui reservas.", 403)
         await store().delete(`bookings/${id}`)
         return json({ ok: true })
       }
@@ -479,7 +507,7 @@ export default async (req: Request, _context: Context) => {
       const ny = await getNewYear(cfg)
       const s = ny.swaps.find((x) => x.id === action)
       if (!s) return fail("Troca não encontrada.", 404)
-      const booked = (await listBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === s.a || y === s.b))
+      const booked = (await activeBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === s.a || y === s.b))
       if (booked) return fail("Já existe reserva num desses Réveillons. Cancele a reserva antes de desfazer a troca.")
       const next = { ...ny, swaps: ny.swaps.filter((x) => x.id !== action) }
       await store().setJSON("newyear", next)

@@ -17,6 +17,15 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - A regra é verificada no servidor; o formulário mostra as vagas e avisa antes de salvar.
 - **Datas passadas bloqueadas** para todos. Estadias concluídas viram histórico: não podem ser editadas; só o admin pode excluir.
 
+## Cancelamento
+- **15 dias ou mais antes da entrada:** cancela sem custo; a reserva sai da agenda e a vaga da família é liberada.
+- **Menos de 15 dias (ou estadia já começada):** a reserva sai do calendário e as datas ficam livres, mas a família paga **todas as diárias**, como se tivesse ido. Fica como pendência no Financeiro até o pagamento ser confirmado.
+- Reserva já paga com 15 dias ou mais: só o admin cancela (para devolver o valor).
+- Só o admin exclui uma reserva de vez (inclusive a cobrança de um cancelamento).
+
+## Ícone no celular
+"Adicionar à tela de início" usa o ícone do Apê do Rio (`public/apple-touch-icon.png`, `icon-192.png`, `icon-512.png` e `manifest.webmanifest`).
+
 ## Despesas
 - Aba **Despesas** visível para todos (inclusive sem login); só admin e editor lançam, editam e excluem.
 - Campos: tipo (lista com ícones — serviços, compras, contas — ou um tipo novo criado na hora), família que contratou, responsável (integrante da família), data, valor e observação.

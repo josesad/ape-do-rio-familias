@@ -289,7 +289,7 @@ async function api(path,opts={}){
 function setToken(t){S.token=t;store.set("apto_token",t)}
 async function load(){
   const d=await api("state");
-  S.me=d.me;S.config=d.config;S.bookings=d.bookings;S.accounts=d.accounts||[];S.newYear=d.newYear||null;S.expenses=d.expenses||[];S.expenseTypes=d.expenseTypes||[];
+  S.me=d.me;S.config=d.config;S.allBookings=d.bookings;S.bookings=d.bookings.filter(b=>!b.cancelled);S.accounts=d.accounts||[];S.newYear=d.newYear||null;S.expenses=d.expenses||[];S.expenseTypes=d.expenseTypes||[];
   if(S.token&&!S.me) setToken(null);
 }
 async function refresh(){try{await load();render()}catch(e){}}
@@ -319,6 +319,7 @@ $("#meBtn").onclick=()=>S.me?openMe():openLogin();
 function bookingItem(b){
   const f=fam(b.familyId),d=parse(b.checkIn),st=statusOf(b);
   const money_=canSeeMoney();
+  if(b.cancelled) return cancelledItem(b,f,d,money_);
   const pill=st==="now"?`<span class="pill acc">Hospedados</span>`:!money_?(st==="past"?`<span class="pill mute">Concluída</span>`:`<span class="pill mute">Agendada</span>`):b.paid?`<span class="pill ok">Pago</span>`:`<span class="pill warn">Pendente</span>`;
   return `<button class="bk ${st==="past"?"past":""}" style="--fc:${f.color}" data-open="${b.id}">
     <span class="bk-date"><b class="num">${d.getDate()}</b><small>${MES[d.getMonth()]}</small></span>
@@ -327,6 +328,19 @@ function bookingItem(b){
       <span class="bk-sub">${range(b.checkIn,b.checkOut)} · ${plural(b.nights,"diária")}</span>
       <span class="bk-sub">${esc(b.responsible)}${ppl(b)}</span>
       ${(()=>{const hs=holBetween(b.checkIn,b.checkOut);return hs.length?`<span class="bk-hol">${ic("star",13,2)}${esc(holNames(hs))}</span>`:""})()}
+    </span>
+    <span class="bk-side">${money_?`<b class="num">${moneyS(b.amount)}</b>`:""}${pill}</span>
+  </button>`;
+}
+/* reserva cancelada com menos de 15 dias: fora do calendário, mas com cobrança */
+function cancelledItem(b,f,d,money_){
+  const pill=!money_?`<span class="pill bad">Cancelada</span>`:b.paid?`<span class="pill ok">Pago</span>`:`<span class="pill warn">Pendente</span>`;
+  return `<button class="bk past cx" style="--fc:${f.color}" data-open="${b.id}">
+    <span class="bk-date"><b class="num">${d.getDate()}</b><small>${MES[d.getMonth()]}</small></span>
+    <span class="bk-main">
+      <span class="bk-fam"><i class="dot"></i><span>${esc(f.name)}</span></span>
+      <span class="bk-sub">${range(b.checkIn,b.checkOut)} · ${plural(b.nights,"diária")}</span>
+      <span class="bk-cx">${ic("x",13,2.2)}Cancelada${money_?" · diárias cobradas":""}</span>
     </span>
     <span class="bk-side">${money_?`<b class="num">${moneyS(b.amount)}</b>`:""}${pill}</span>
   </button>`;
@@ -475,10 +489,10 @@ function openDay(s){
    Reservas
    ========================================================= */
 function renderReservas(v){
-  const t=today();let list=S.bookings.slice();
+  const t=today();let list=S.allBookings.slice();
   if(S.listFilter==="pendentes"&&!canSeeMoney()) S.listFilter="proximas";
-  if(S.listFilter==="proximas") list=list.filter(b=>b.checkOut>t);
-  if(S.listFilter==="passadas") list=list.filter(b=>b.checkOut<=t).reverse();
+  if(S.listFilter==="proximas") list=list.filter(b=>!b.cancelled&&b.checkOut>t);
+  if(S.listFilter==="passadas") list=list.filter(b=>!b.cancelled&&b.checkOut<=t).reverse();
   if(S.listFilter==="pendentes") list=list.filter(b=>!b.paid);
   if(S.famFilter) list=list.filter(b=>b.familyId===S.famFilter);
   v.innerHTML=`
@@ -502,8 +516,8 @@ function renderReservas(v){
    Financeiro
    ========================================================= */
 function renderFinanceiro(v){
-  const years=[...new Set([...S.bookings.map(b=>b.checkIn.slice(0,4)),...(S.expenses||[]).map(e=>e.date.slice(0,4))])].sort();
-  const bs=S.finYear==="todos"?S.bookings:S.bookings.filter(b=>b.checkIn.startsWith(S.finYear));
+  const years=[...new Set([...S.allBookings.map(b=>b.checkIn.slice(0,4)),...(S.expenses||[]).map(e=>e.date.slice(0,4))])].sort();
+  const bs=S.finYear==="todos"?S.allBookings:S.allBookings.filter(b=>b.checkIn.startsWith(S.finYear));
   const ex=S.finYear==="todos"?(S.expenses||[]):(S.expenses||[]).filter(e=>e.date.startsWith(S.finYear));
   const total=bs.reduce((s,b)=>s+b.amount,0),pago=bs.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
   const desp=ex.reduce((s,e)=>s+e.amount,0),saldo=pago-desp,previsto=total-desp;
@@ -797,7 +811,7 @@ function renderAdmin(v){
   };
   $$("[data-rmfam]",v).forEach(b=>{
     const i=+b.dataset.rmfam,f=S.config.families[i];
-    if(S.bookings.some(x=>x.familyId===f.id)){b.onclick=()=>toast("Essa família tem reservas e não pode ser removida","info");return}
+    if(S.allBookings.some(x=>x.familyId===f.id)){b.onclick=()=>toast("Essa família tem reservas e não pode ser removida","info");return}
     armConfirm(b,"",()=>{const fs=readFams();fs.splice(i,1);S.config.families=fs;S.famTab=Math.max(0,i-1);render();toast("Toque em Salvar famílias para confirmar","info")});
   });
   $$("[data-acc]",v).forEach(b=>b.onclick=()=>openAccount(S.accounts.find(a=>a.role===b.dataset.acc)));
@@ -830,9 +844,38 @@ function closeSheet(){$$(".sheet-bg").forEach(x=>x.remove());document.body.style
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
 function sheetHead(t){return `<div class="sheet-h"><h3>${t}</h3><button class="x" data-close aria-label="Fechar">${ic("x",18)}</button></div>`}
 
+/* ---------- cancelar reserva (regra dos 15 dias) ---------- */
+const CANCEL_FREE_DAYS=15;
+function openCancel(b){
+  const f=fam(b.familyId),days=Math.round((parse(b.checkIn)-parse(today()))/86400000);
+  const free=days>=CANCEL_FREE_DAYS,blocked=free&&b.paid&&!isAdmin();
+  const when=days>0?`<b>${plural(days,"dia")}</b> antes da entrada`:days===0?`A entrada é <b>hoje</b>`:`A estadia <b>já começou</b>`;
+  const msg=blocked?`<div class="rule-warn">${ic("info",18)}<span>Esta reserva já foi paga. Só o administrador pode cancelar sem custo, para devolver o valor.</span></div>`
+    :free?`<div class="rule-ok">${ic("check",18,2.2)}<span>Cancelamento sem custo. A reserva sai da agenda, as datas ficam livres e a família não paga nada.</span></div>`
+    :`<div class="rule-warn">${ic("info",18)}<span>Cancelamento com menos de ${CANCEL_FREE_DAYS} dias: a família paga todas as diárias, como se tivesse ido. As datas ficam livres e a reserva fica como pendência no financeiro.</span></div>`;
+  openSheet(`${sheetHead("Cancelar reserva")}
+    <dl class="dl">
+      <div><dt>Família</dt><dd><span class="sheet-fam" style="--fc:${f.color}"><i class="dot"></i>${esc(f.name)}</span></dd></div>
+      <div><dt>Período</dt><dd>${range(b.checkIn,b.checkOut)} · ${plural(b.nights,"diária")}</dd></div>
+      <div><dt>Antecedência</dt><dd>${when}</dd></div>
+      <div><dt>A pagar</dt><dd><b class="num">${free?money(0):money(b.amount)}</b>${free?"":` <span class="muted">(${b.nights} × ${money(b.rate)})</span>`}</dd></div>
+    </dl>
+    ${msg}
+    <p class="muted">Regra: cancelando com ${CANCEL_FREE_DAYS} dias ou mais de antecedência, não há custo. Com menos de ${CANCEL_FREE_DAYS} dias, as diárias são cobradas por completo.</p>
+    <div class="actions">
+      <button class="btn ghost" id="cxBack">Voltar</button>
+      <button class="btn danger" id="cxOk" ${blocked?"disabled":""}>${ic("x",18)}Cancelar</button>
+    </div>`);
+  $("#cxBack").onclick=()=>openDetail(b.id);
+  if(!blocked) armConfirm($("#cxOk"),"Confirmar",async()=>{
+    try{const r=await api(`bookings/${b.id}/cancel`,{method:"POST"});closeSheet();
+      toast(r.free?"Reserva cancelada sem custo":`Reserva cancelada · ${moneyS(b.amount)} a pagar`);await refresh()}catch(e){toast(e.message,"info")}
+  });
+}
+
 /* ---------- detalhes da reserva ---------- */
 function openDetail(id){
-  const b=S.bookings.find(x=>x.id===id);if(!b)return;
+  const b=S.allBookings.find(x=>x.id===id);if(!b)return;
   const f=fam(b.familyId),st=statusOf(b);
   const row=(k,val)=>val?`<div><dt>${k}</dt><dd>${val}</dd></div>`:"";
   openSheet(`${sheetHead(`<span class="sheet-fam" style="--fc:${f.color}"><i class="dot"></i>${esc(f.name)}</span>`)}
@@ -847,11 +890,14 @@ function openDetail(id){
       ${canSeeMoney()?row("Valor",`<span class="num">${money(b.amount)}</span>`):""}
       ${canSeeMoney()?row("Pagamento",b.paid?`<span class="pill ok">Pago em ${dm(b.paidAt)}</span>`:`<span class="pill warn">Pendente</span>`):""}
       ${canSeeMoney()&&b.paid&&b.paymentNote?row("Obs. do pagamento",esc(b.paymentNote)):""}
-      ${row("Situação",st==="now"?"Hospedados agora":st==="past"?"Concluída":"Agendada")}
+      ${row("Situação",b.cancelled?`<span class="pill bad">Cancelada</span>`:st==="now"?"Hospedados agora":st==="past"?"Concluída":"Agendada")}
+      ${b.cancelled?row("Cancelada em",`${dm(b.cancelledAt.slice(0,10))} · ${b.cancelDays?`${plural(b.cancelDays,"dia")} antes`:"no início"}`):""}
+      ${b.cancelled&&b.cancelledBy?row("Cancelada por",esc(b.cancelledBy)):""}
       ${row("Tipo",isHolBooking(b)?"Feriado":"Tempo comum")}
       ${row("Feriados",esc(holBetween(b.checkIn,b.checkOut).map(x=>`${x.short} (${dm(x.date)})`).join(", ")))}
       ${row("Marcada por",esc(b.createdByName))}
     </dl>
+    ${b.cancelled?`<div class="rule-warn">${ic("info",18)}<span>Cancelada com menos de ${CANCEL_FREE_DAYS} dias de antecedência: a família paga todas as diárias, como se tivesse ido. As datas ficaram livres no calendário.</span></div>`:""}
     ${S.me?(b.paid?(isAdmin()?`<button class="btn ghost full" id="payUndo">${ic("undo",18)}Desfazer pagamento</button>`:""):`
       <div class="box"><h4>${ic("wallet",18)}Registrar pagamento</h4>
         <div class="row2">
@@ -859,15 +905,18 @@ function openDetail(id){
           <label class="field"><span>Observação</span><input id="payNote" placeholder="Ex.: Pix"></label>
         </div>
         <button class="btn full" id="payOk">${ic("check",18,2.2)}Confirmar ${moneyS(b.amount)}</button></div>`):""}
-    ${S.me&&st==="past"?`<p class="muted" style="display:flex;gap:6px;align-items:center">${ic("lock",16)}Estadia concluída: faz parte do histórico e não pode ser alterada.</p>
+    ${b.cancelled?`
+      ${isAdmin()?`<button class="btn danger full" id="dDel">${ic("trash",18)}Excluir reserva e cobrança</button>`:""}`
+    :S.me&&st==="past"?`<p class="muted" style="display:flex;gap:6px;align-items:center">${ic("lock",16)}Estadia concluída: faz parte do histórico e não pode ser alterada.</p>
       ${isAdmin()?`<button class="btn danger full" id="dDel">${ic("trash",18)}Excluir do histórico</button>`:""}`
     :S.me?`<div class="actions">
       <button class="btn ghost" id="dEdit">${ic("edit",18)}Editar</button>
-      ${!b.paid||isAdmin()?`<button class="btn danger" id="dDel">${ic("trash",18)}Cancelar</button>`:`<button class="btn ghost" disabled>Paga</button>`}
+      <button class="btn danger" id="dCancel">${ic("x",18)}Cancelar</button>
     </div>`:""}`);
   if($("#dEdit")) $("#dEdit").onclick=()=>openBooking(b);
+  if($("#dCancel")) $("#dCancel").onclick=()=>openCancel(b);
   if($("#dDel")) armConfirm($("#dDel"),"Confirmar",async()=>{
-    try{await api("bookings/"+b.id,{method:"DELETE"});closeSheet();toast("Reserva cancelada");await refresh()}catch(e){toast(e.message,"info")}
+    try{await api("bookings/"+b.id,{method:"DELETE"});closeSheet();toast("Reserva excluída");await refresh()}catch(e){toast(e.message,"info")}
   });
   const pay=async paid=>{
     try{await api(`bookings/${b.id}/payment`,{method:"POST",body:{paid,paidAt:paid?$("#payDate").value:null,paymentNote:paid?$("#payNote").value:""}});
