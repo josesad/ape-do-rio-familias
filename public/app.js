@@ -495,8 +495,12 @@ function openDay(s){
     ${hs.map(x=>`<div class="hol-note">${ic("star",18,2)}<span>${esc(x.name)} · ${HOL_TYPE[x.type]}${x.top?" · alta procura":""}</span></div>`).join("")}
     ${stays.length?`<div class="list card">${stays.map(bookingItem).join("")}</div>`:`<div class="card empty"><span class="ei">${ic("bed",22)}</span>Apartamento livre nesta noite.</div>`}
     ${out.length?`<p class="muted">Saída neste dia: ${out.map(b=>esc(fam(b.familyId).name)).join(", ")}</p>`:""}
-    ${canBook()&&s>=today()?`<button class="btn full" id="bookDay">${ic("plus",18,2.2)}Reservar a partir deste dia</button>`:""}`);
+    ${canBook()&&s>=today()?(stays.length&&!S.config.allowOverlap
+      ?`<p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Esta noite já está ocupada, então não dá para marcar a partir deste dia.</span></p>
+        <button class="btn ghost full" id="bookOther">${ic("plus",18,2.2)}Escolher outro dia</button>`
+      :`<button class="btn full" id="bookDay">${ic("plus",18,2.2)}Reservar a partir deste dia</button>`):""}`);
   const bd=$("#bookDay");if(bd) bd.onclick=()=>openBooking(null,s);
+  const bo=$("#bookOther");if(bo) bo.onclick=()=>openBooking(null);
   bindItems($(".sheet"));
 }
 
@@ -1067,7 +1071,10 @@ function openBooking(b=null,startDay=null){
       rpSel={a:s,b:""};
     }else{
       let clash=false;for(let d=rpSel.a;d<s;d=addDays(d,1))if(busy.has(d)){clash=true;break}
-      if(clash){rpMsg="O período passa por dias já reservados. Escolha uma saída antes deles.";drawRP();return}
+      if(clash){
+        /* tocou num dia livre depois de uma reserva: vira a nova entrada, em vez de travar */
+        if(!busy.has(s)){rpSel={a:s,b:""};$("#bkIn").value=s;$("#bkOut").value="";rpMsg="";drawRP();calc();return}
+        rpMsg="O período passa por dias já reservados. Escolha uma saída antes deles.";drawRP();return}
       rpSel.b=s;
     }
     $("#bkIn").value=rpSel.a;$("#bkOut").value=rpSel.b;
