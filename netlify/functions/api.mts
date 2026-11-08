@@ -13,7 +13,7 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 type Role = "admin" | "editor"
 
 interface Family { id: string; name: string; color: string; members: string[] }
-interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxTotal?: number; maxCommon?: number; maxHoliday?: number; maxNightsCommon?: number; maxNightsPeak?: number }
+interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxTotal?: number; maxCommon?: number; maxHoliday?: number; maxNightsCommon?: number; maxNightsPeak?: number; saldoAnterior?: number }
 interface Account { role: Role; username: string; name: string; salt: string; hash: string; updatedAt: string }
 interface Booking {
   id: string; familyId: string; responsible: string; people?: number | null; guestNames: string
@@ -26,6 +26,8 @@ interface Booking {
 /** cancelamento sem custo só com esta antecedência (em dias) ou mais */
 const CANCEL_FREE_DAYS = 15
 
+/* saldo que veio dos anos anteriores (até 2025), usado enquanto não for alterado nas configurações */
+const SALDO_ANTERIOR_PADRAO = 4646.81
 const DEFAULT_CONFIG: AppConfig = {
   dailyRate: 70,
   allowOverlap: false,
@@ -531,11 +533,14 @@ export default async (req: Request, _context: Context) => {
         color: /^#[0-9a-fA-F]{6}$/.test(f.color) ? f.color : "#888888",
         members: (Array.isArray(f.members) ? f.members : []).map((m: any) => String(m).trim().slice(0, 80)).filter(Boolean).slice(0, 60),
       }))
+      const prevBal = Math.round(Number(body.saldoAnterior ?? cfg.saldoAnterior ?? SALDO_ANTERIOR_PADRAO) * 100) / 100
+      if (!Number.isFinite(prevBal) || Math.abs(prevBal) > 10000000) return fail("Saldo de anos anteriores inválido.")
       const lim = (v: any, d: number) => { const n = Math.floor(Number(v ?? d)); return n >= 0 && n <= 50 ? n : d }
       const next: AppConfig = {
         dailyRate: rate, allowOverlap: !!body.allowOverlap, families: clean,
         maxTotal: lim(body.maxTotal, cfg.maxTotal ?? 2), maxCommon: lim(body.maxCommon, cfg.maxCommon ?? 2), maxHoliday: lim(body.maxHoliday, cfg.maxHoliday ?? 2),
         maxNightsCommon: lim(body.maxNightsCommon, cfg.maxNightsCommon ?? 10), maxNightsPeak: lim(body.maxNightsPeak, cfg.maxNightsPeak ?? 6),
+        saldoAnterior: prevBal,
       }
       await store().setJSON("config", next)
       return json(next)

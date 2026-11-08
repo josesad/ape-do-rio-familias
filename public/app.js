@@ -89,6 +89,10 @@ const expTypes=()=>[...EXP_DEFAULT,...(S.expenseTypes||[])];
 const expType=id=>expTypes().find(t=>t.id===id);
 
 /* paleta suave para as famílias */
+/* saldo que veio dos anos anteriores (até 2025), usado enquanto não for alterado nas configurações */
+const SALDO_ANTERIOR_PADRAO=4646.81;
+const saldoAnterior=()=>S.config?.saldoAnterior??SALDO_ANTERIOR_PADRAO;
+
 const PALETTE=["#D4899A","#6EA6C4","#D3A867","#9A8DCB","#7DAF8E","#DB9478","#5FADA8","#8F9DB2"];
 
 /* =========================================================
@@ -523,15 +527,17 @@ function renderFinanceiro(v){
   const bs=S.finYear==="todos"?S.allBookings:S.allBookings.filter(b=>b.checkIn.startsWith(S.finYear));
   const ex=S.finYear==="todos"?(S.expenses||[]):(S.expenses||[]).filter(e=>e.date.startsWith(S.finYear));
   const total=bs.reduce((s,b)=>s+b.amount,0),pago=bs.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0);
-  const desp=ex.reduce((s,e)=>s+e.amount,0),saldo=pago-desp,previsto=total-desp;
+  const todos=S.finYear==="todos",ant=todos?saldoAnterior():0;
+  const desp=ex.reduce((s,e)=>s+e.amount,0),saldo=ant+pago-desp,previsto=ant+total-desp;
   const pend=bs.filter(b=>!b.paid);
   const pct=total?Math.round(pago/total*100):0;
   v.innerHTML=`
     <div class="chips">${["todos",...years].map(y=>`<button class="chip ${S.finYear===y?"on":""}" data-fy="${y}">${y==="todos"?"Todos os anos":y}</button>`).join("")}</div>
     <div class="card saldo">
       <div class="fin-total">
-        <div><div class="eyebrow">Saldo atual</div><div class="big num ${saldo<0?"neg":"pos"}">${money(saldo)}</div><div class="muted">Recebido das reservas menos as despesas</div></div>
+        <div><div class="eyebrow">Saldo atual</div><div class="big num ${saldo<0?"neg":"pos"}">${money(saldo)}</div><div class="muted">${todos?"Saldo dos anos anteriores mais o recebido das reservas, menos as despesas":"Recebido das reservas menos as despesas"}</div></div>
         <div class="saldo-grid">
+          ${todos?`<div style="grid-column:1/-1"><span class="lbl">${ic("inbox",15)}Saldo dos anos anteriores</span><b class="num" style="color:${ant<0?"var(--bad)":"var(--ink)"}">${money(ant)}</b></div>`:""}
           <div><span class="lbl">${ic("wallet",15)}Recebido</span><b class="num" style="color:var(--ok)">${money(pago)}</b></div>
           <div><span class="lbl">${ic("receipt",15)}Despesas</span><b class="num" style="color:var(--bad)">− ${money(desp)}</b></div>
         </div>
@@ -717,6 +723,8 @@ function renderAdmin(v){
           <p class="muted">Vale para qualquer estadia, com ou sem feriado. Em janeiro e julho vale o limite menor. Use 0 para não limitar.</p>
           <label class="check"><input type="checkbox" id="cfgOverlap" ${c.allowOverlap?"checked":""}>Permitir duas famílias no mesmo período</label>
           <p class="muted">A nova diária vale só para reservas feitas depois da mudança.</p>
+          <label class="field"><span>Saldo dos anos anteriores (R$)</span><input type="number" step="0.01" id="cfgSaldoAnt" value="${saldoAnterior()}" inputmode="decimal"></label>
+          <p class="muted">Dinheiro que já estava em caixa antes dos lançamentos do app. Entra só no saldo de "Todos os anos" no Financeiro.</p>
           <button class="btn" id="saveCfg" style="align-self:flex-start">Salvar cobrança e regras</button>
         </div>
       </div>
@@ -776,7 +784,7 @@ function renderAdmin(v){
     </section>`;
 
   $("#saveCfg").onclick=async()=>{
-    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),maxTotal:Number($("#cfgMaxTotal").value),maxCommon:Number($("#cfgMaxCommon").value),maxHoliday:Number($("#cfgMaxHoliday").value),maxNightsCommon:Number($("#cfgMaxNightsCommon").value),maxNightsPeak:Number($("#cfgMaxNightsPeak").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança e regras salvas");await refresh()}catch(e){toast(e.message,"info")}
+    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),maxTotal:Number($("#cfgMaxTotal").value),maxCommon:Number($("#cfgMaxCommon").value),maxHoliday:Number($("#cfgMaxHoliday").value),maxNightsCommon:Number($("#cfgMaxNightsCommon").value),maxNightsPeak:Number($("#cfgMaxNightsPeak").value),saldoAnterior:Number($("#cfgSaldoAnt").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança e regras salvas");await refresh()}catch(e){toast(e.message,"info")}
   };
   const readFams=()=>$$("#famEdit [data-i]").map(el=>{
     const f=S.config.families[+el.dataset.i]||{};
