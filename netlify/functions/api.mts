@@ -153,7 +153,7 @@ function nyYearsIn(a: string, b: string) {
    Tipos padrão ficam no site (app.js); aqui guardamos só os tipos criados pelas pessoas. */
 interface ExpenseType { id: string; name: string; group: string; icon: string; custom: true; createdBy: string }
 interface Expense {
-  id: string; typeId: string; typeName: string; icon: string; familyId: string; responsible: string
+  id: string; typeId: string; typeName: string; icon: string; familyId?: string; responsible?: string
   date: string; amount: number; notes: string; createdBy: string; createdByName: string; createdAt: string; updatedAt: string
 }
 const ICON_KEYS = ["ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","wrench","hammer","droplet","zap","sparkles",
@@ -364,15 +364,10 @@ export default async (req: Request, _context: Context) => {
         const typeName = String(body.typeName || "").trim().slice(0, 60)
         if (!typeId || !typeName) return { error: "Escolha o tipo de despesa." }
         const icon = ICON_KEYS.includes(body.icon) ? body.icon : "tag"
-        const fam = cfg.families.find((f) => f.id === body.familyId)
-        if (!fam) return { error: "Escolha a família que contratou." }
-        const responsible = String(body.responsible || "").trim().slice(0, 80)
-        if (!responsible) return { error: "Selecione o responsável da família." }
-        if (!fam.members.includes(responsible)) return { error: `${responsible} não está entre os integrantes da família ${fam.name}.` }
         if (!DATE_RE.test(body.date || "")) return { error: "Informe a data da despesa." }
         const amount = Math.round(Number(String(body.amount).replace(",", ".")) * 100) / 100
         if (!(amount > 0 && amount <= 1000000)) return { error: "Informe um valor maior que zero." }
-        return { data: { typeId, typeName, icon, familyId: fam.id, responsible, date: body.date, amount, notes: String(body.notes || "").trim().slice(0, 300) } }
+        return { data: { typeId, typeName, icon, date: body.date, amount, notes: String(body.notes || "").trim().slice(0, 300) } }
       }
       if (method === "POST" && !id) {
         const v = await read(); if (v.error) return fail(v.error)
@@ -386,7 +381,8 @@ export default async (req: Request, _context: Context) => {
         if (!old) return fail("Despesa não encontrada.", 404)
         if (method === "PUT") {
           const v = await read(); if (v.error) return fail(v.error)
-          const e: Expense = { ...old, ...v.data!, updatedAt: now() }
+          const { familyId: _f, responsible: _r, ...rest } = old
+          const e: Expense = { ...rest, ...v.data!, updatedAt: now() }
           await store().setJSON(`expenses/${id}`, e)
           return json(e)
         }

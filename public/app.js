@@ -569,12 +569,11 @@ function renderFinanceiro(v){
    Despesas (visível para todos; admin e editor cadastram)
    ========================================================= */
 function expItem(e){
-  const f=fam(e.familyId),t=expType(e.typeId);
+  const t=expType(e.typeId);
   return `<button class="bk ex" data-exp="${e.id}">
     <span class="ex-ic">${ic(t?.icon||e.icon||"tag",22)}</span>
     <span class="bk-main">
       <span class="bk-fam"><span>${esc(e.typeName)}</span></span>
-      <span class="bk-sub"><i class="dot" style="--fc:${f.color};display:inline-block;margin-right:5px;vertical-align:1px"></i>${esc(f.name)} · ${esc(e.responsible)}</span>
       <span class="bk-sub">${dmw(e.date)}${e.notes?" · "+esc(e.notes):""}</span>
     </span>
     <span class="bk-side"><b class="num">${money(e.amount)}</b></span>
@@ -605,15 +604,13 @@ function renderDespesas(v){
 }
 function openExpenseDetail(id){
   const e=(S.expenses||[]).find(x=>x.id===id);if(!e)return;
-  const f=fam(e.familyId),t=expType(e.typeId);
+  const t=expType(e.typeId);
   const row=(k,val)=>val?`<div><dt>${k}</dt><dd>${val}</dd></div>`:"";
   openSheet(`${sheetHead(`<span class="sheet-fam"><span class="ex-ic sm">${ic(t?.icon||e.icon||"tag",18)}</span>${esc(e.typeName)}</span>`)}
     <dl class="dl">
       ${row("Valor",`<span class="num">${money(e.amount)}</span>`)}
       ${row("Data",dmw(e.date))}
       ${row("Categoria",esc(t?.group||"Outros"))}
-      ${row("Família que contratou",`<span style="display:inline-flex;align-items:center;gap:6px"><i class="dot" style="--fc:${f.color}"></i>${esc(f.name)}</span>`)}
-      ${row("Responsável",esc(e.responsible))}
       ${row("Observação",esc(e.notes))}
       ${row("Lançada por",esc(e.createdByName))}
     </dl>
@@ -625,8 +622,8 @@ function openExpenseDetail(id){
 }
 function parseMoney(s){s=String(s||"").trim().replace(/[^\d.,]/g,"");if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");const n=parseFloat(s);return isFinite(n)?Math.round(n*100)/100:NaN}
 function openExpense(e=null){
-  const d=e?{...e}:{typeId:"",familyId:"",responsible:"",date:today(),amount:"",notes:""};
-  let typeId=d.typeId,famId=d.familyId,respSel=d.responsible;
+  const d=e?{...e}:{typeId:"",date:today(),amount:"",notes:""};
+  let typeId=d.typeId;
   openSheet(`${sheetHead(e?"Editar despesa":"Nova despesa")}
     <div class="form">
       <div id="exErr" class="err hidden"></div>
@@ -644,9 +641,6 @@ function openExpense(e=null){
           </div>
         </div>
       </div>
-      <div class="field" id="fxFam"><span>Família que contratou</span>
-        <div class="fam-pick">${S.config.families.map(f=>`<button type="button" style="--fc:${f.color}" data-xfam="${f.id}" class="${famId===f.id?"on":""}"><i class="dot"></i><span>${esc(f.name)}</span></button>`).join("")}</div></div>
-      <label class="field" id="fxResp"><span>Responsável</span><select id="exResp"></select></label>
       <div class="row2">
         <label class="field" id="fxDate"><span>Data</span><input type="date" id="exDate" value="${d.date}"></label>
         <label class="field" id="fxAmt"><span>Valor</span><div class="money-in"><span>R$</span><input id="exAmount" inputmode="decimal" placeholder="0,00" value="${d.amount!==""?String(d.amount).replace(".",","):""}"></div></label>
@@ -677,28 +671,19 @@ function openExpense(e=null){
       $("#fxType").classList.remove("invalid");drawTypeBtn();toast("Tipo criado")}
     catch(err){$("#exErr").textContent=err.message;$("#exErr").classList.remove("hidden")}
   };
-  const fillResp=()=>{const sel=$("#exResp");
-    if(!famId){sel.innerHTML=`<option value="">Escolha a família primeiro</option>`;sel.disabled=true;return}
-    const m=fam(famId).members,legacy=e&&e.familyId===famId&&!m.includes(e.responsible)?e.responsible:null;
-    sel.disabled=false;sel.innerHTML=`<option value="">Selecione o responsável</option>`+m.map(x=>`<option>${esc(x)}</option>`).join("")+(legacy?`<option>${esc(legacy)}</option>`:"");
-    sel.value=m.includes(respSel)||respSel===legacy?respSel:(m.length===1?m[0]:"");respSel=sel.value};
-  $$("[data-xfam]").forEach(b=>b.onclick=()=>{famId=b.dataset.xfam;$("#fxFam").classList.remove("invalid");$$("[data-xfam]").forEach(x=>x.classList.toggle("on",x===b));fillResp()});
-  $("#exResp").onchange=ev=>{respSel=ev.target.value;$("#fxResp").classList.remove("invalid")};
   $("#exDate").onchange=()=>$("#fxDate").classList.remove("invalid");
   $("#exAmount").oninput=()=>$("#fxAmt").classList.remove("invalid");
-  drawTypeBtn();fillResp();if(!typeId){$("#exTypePanel").classList.remove("hidden");drawTypes()}
+  drawTypeBtn();if(!typeId){$("#exTypePanel").classList.remove("hidden");drawTypes()}
   $("#exSave").onclick=async()=>{
     const btn=$("#exSave");btn.disabled=true;$("#exErr").classList.add("hidden");$$(".field.invalid").forEach(x=>x.classList.remove("invalid"));
     const t=expType(typeId)||(e&&e.typeId===typeId?{id:e.typeId,name:e.typeName,icon:e.icon}:null),amount=parseMoney($("#exAmount").value);
     const miss=[];
     if(!t){miss.push("tipo");$("#fxType").classList.add("invalid")}
-    if(!famId){miss.push("família");$("#fxFam").classList.add("invalid")}
-    if(!$("#exResp").value){miss.push("responsável");$("#fxResp").classList.add("invalid")}
     if(!$("#exDate").value){miss.push("data");$("#fxDate").classList.add("invalid")}
     if(!(amount>0)){miss.push("valor");$("#fxAmt").classList.add("invalid")}
     try{
       if(miss.length) throw new Error(`Preencha: ${miss.join(", ")}.`);
-      const body={typeId:t.id,typeName:t.name,icon:t.icon,familyId:famId,responsible:$("#exResp").value,date:$("#exDate").value,amount,notes:$("#exNotes").value};
+      const body={typeId:t.id,typeName:t.name,icon:t.icon,date:$("#exDate").value,amount,notes:$("#exNotes").value};
       if(e) await api("expenses/"+e.id,{method:"PUT",body}); else await api("expenses",{method:"POST",body});
       closeSheet();toast(e?"Despesa atualizada":"Despesa lançada");S.tab="despesas";await refresh();
     }catch(err){$("#exErr").textContent=err.message;$("#exErr").classList.remove("hidden");$(".sheet").scrollTo({top:0,behavior:"smooth"});btn.disabled=false}
