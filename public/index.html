@@ -245,7 +245,13 @@ main{max-width:880px;margin:0 auto;padding:16px 16px calc(var(--nav-h) + 96px + 
 .rp-d.start span,.rp-d.end span,.rp-d.start:hover span,.rp-d.end:hover span{background:var(--accent);color:var(--accent-ink)}
 .rp-d.today span{box-shadow:inset 0 0 0 1px var(--ink-3)}
 .rp-d.hol span{color:var(--hol)}
-.rp-d.busy span{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--ink-3)}
+/* dia ocupado: faixa suave na cor da família, pontas arredondadas no início/fim da reserva */
+.rp-d.busy::before{content:"";position:absolute;top:5px;bottom:5px;left:0;right:0;background:var(--line-2);background:color-mix(in srgb,var(--bc) 20%,transparent)}
+.rp-d.busy.bs::before{left:3px;border-top-left-radius:999px;border-bottom-left-radius:999px}
+.rp-d.busy.be::before{right:3px;border-top-right-radius:999px;border-bottom-right-radius:999px}
+.rp-d.busy span{color:var(--ink-2);font-weight:500;cursor:not-allowed}
+.rp-d.busy.bs span::after{content:"";position:absolute;left:50%;bottom:2px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--bc)}
+.rp-d.busy:hover span{background:transparent!important}
 .rp-d.dis{color:var(--line);cursor:default}
 .rp-d.dis span{color:var(--line)}
 .rp-hint{font-size:13px;color:var(--ink-2);text-align:center;padding:4px 0 2px}
@@ -253,6 +259,7 @@ main{max-width:880px;margin:0 auto;padding:16px 16px calc(var(--nav-h) + 96px + 
 .rp-legend{display:flex;gap:14px;justify-content:center;font-size:11.5px;color:var(--ink-3)}
 .rp-legend span{display:flex;align-items:center;gap:5px}
 .rp-legend .lg{width:14px;height:2px;background:var(--ink-3);display:inline-block}
+.rp-legend .lg.busy{width:16px;height:9px;border-radius:999px;background:var(--line-2);background:color-mix(in srgb,var(--ink-3) 30%,transparent)}
 .rp-legend .lg.hol{width:8px;height:8px;border-radius:50%;background:var(--hol)}
 @media(max-width:819px){.nav.n6 button{font-size:10.5px;padding-left:0;padding-right:0}}
 .ex-ic{width:46px;height:46px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}

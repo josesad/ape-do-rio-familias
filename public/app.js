@@ -1022,8 +1022,9 @@ function openBooking(b=null,startDay=null){
   /* calendário do período: 1º toque = entrada, 2º toque = saída */
   /* datas passadas bloqueadas para todos (ao editar estadia em andamento, mantém a entrada original) */
   const minDay=b&&b.checkIn<today()?b.checkIn:today();
-  const busy=new Set();
-  if(!S.config.allowOverlap) S.bookings.forEach(x=>{if(b&&x.id===b.id)return;for(let d=x.checkIn;d<x.checkOut;d=addDays(d,1))busy.add(d)});
+  /* dias ocupados → família que reservou (para pintar na cor dela) */
+  const busy=new Map();
+  if(!S.config.allowOverlap) S.bookings.forEach(x=>{if(b&&x.id===b.id)return;for(let d=x.checkIn;d<x.checkOut;d=addDays(d,1))busy.set(d,x.familyId)});
   let rpSel={a:data.checkIn||"",b:data.checkOut||""},rpMsg="";
   const f0=parse(rpSel.a||today());let rpM={y:f0.getFullYear(),m:f0.getMonth()};
   const drawRP=()=>{
@@ -1034,9 +1035,11 @@ function openBooking(b=null,startDay=null){
     const tooFar=s=>{if(!rpSel.a||rpSel.b||s<=rpSel.a||s<=today())return false;const r=maxNightsFor(rpSel.a,s,false);return r.max>0&&nights(rpSel.a,s)>r.max};
     for(let dd=1;dd<=days;dd++){
       const s=`${y}-${pad(m+1)}-${pad(dd)}`,{a,b:z}=rpSel,off=s<minDay||tooFar(s);
-      const cls=[off?"dis":"",busy.has(s)?"busy":"",holOn(s).length?"hol":"",s===t?"today":"",
+      const bf=busy.get(s),prevB=busy.get(addDays(s,-1)),nextB=busy.get(addDays(s,1)),wd=(first.getDay()+dd-1)%7;
+      const cls=[off?"dis":"",bf?"busy":"",bf&&(prevB!==bf||wd===0)?"bs":"",bf&&(nextB!==bf||wd===6||dd===days)?"be":"",bf&&dd===1?"bs":"",holOn(s).length?"hol":"",s===t?"today":"",
         a&&s===a?"start":"",z&&s===z?"end":"",a&&z&&s>a&&s<z?"in":"",a&&z?"has":""].join(" ");
-      cells+=`<button type="button" class="rp-d ${cls}" data-rp="${s}" ${off?"disabled":""} aria-label="${dmw(s)}${busy.has(s)?" · reservado":""}"><span>${dd}</span></button>`;
+      const bn=bf?fam(bf).name:"";
+      cells+=`<button type="button" class="rp-d ${cls}" data-rp="${s}" ${off?"disabled":""} ${bf?`style="--bc:${fam(bf).color}" title="Reservado · ${esc(bn)}"`:""} aria-label="${dmw(s)}${bf?` · reservado para ${esc(bn)}`:""}"><span>${dd}</span></button>`;
     }
     const nm=n=>n?plural(n,"diária"):"";
     const sum=rpSel.a?`<div class="rp-sum"><div><small>Entrada</small><b>${dmw(rpSel.a)}</b></div><div><small>Saída</small><b>${rpSel.b?dmw(rpSel.b):"—"}</b></div></div>`:"";
@@ -1049,7 +1052,7 @@ function openBooking(b=null,startDay=null){
       <div class="rp-dow">${SEM.map(d=>`<div>${d[0].toUpperCase()}</div>`).join("")}</div>
       <div class="rp-grid">${cells}</div>
       <div class="rp-hint ${rpMsg?"warn":""}">${hint}</div>
-      <div class="rp-legend"><span><i class="lg busy"></i>Já reservado</span><span><i class="lg hol"></i>Feriado</span></div>`;
+      <div class="rp-legend"><span><i class="lg busy"></i>Já reservado (cor da família)</span><span><i class="lg hol"></i>Feriado</span></div>`;
     $("#rpPrev").onclick=()=>{rpM.m--;if(rpM.m<0){rpM.m=11;rpM.y--}drawRP()};
     $("#rpNext").onclick=()=>{rpM.m++;if(rpM.m>11){rpM.m=0;rpM.y++}drawRP()};
     $$("[data-rp]",$("#rp")).forEach(x=>x.onclick=()=>pickRP(x.dataset.rp));
@@ -1057,7 +1060,7 @@ function openBooking(b=null,startDay=null){
   const pickRP=s=>{
     rpMsg="";
     if(!rpSel.a||rpSel.b||s<=rpSel.a){
-      if(busy.has(s)){rpMsg="Esse dia já está reservado. Escolha outro dia de entrada.";drawRP();return}
+      if(busy.has(s)){rpMsg=`Esse dia já está reservado para ${fam(busy.get(s)).name}. Escolha outro dia de entrada.`;drawRP();return}
       rpSel={a:s,b:""};
     }else{
       let clash=false;for(let d=rpSel.a;d<s;d=addDays(d,1))if(busy.has(d)){clash=true;break}
