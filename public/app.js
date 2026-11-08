@@ -272,7 +272,7 @@ const fam=id=>S.config.families.find(f=>f.id===id)||{id,name:"Família removida"
 const initials=s=>s.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
 const isAdmin=()=>S.me?.role==="admin";
 const canBook=()=>!!S.me;
-const canSeeMoney=()=>!!S.me; /* financeiro: só administrador e editor */
+const canSeeMoney=()=>true; /* financeiro aberto a qualquer um com o link (só leitura; ações continuam exigindo login) */
 const statusOf=b=>{const t=today();return b.checkOut<=t?"past":b.checkIn<=t?"now":"future"};
 
 function toast(msg,icon="check"){
@@ -895,7 +895,7 @@ function openDetail(id){
       ${row("Observações",esc(b.notes))}
       ${canSeeMoney()?row("Valor",`<span class="num">${money(b.amount)}</span>`):""}
       ${canSeeMoney()?row("Pagamento",b.paid?`<span class="pill ok">Pago em ${dm(b.paidAt)}</span>`:`<span class="pill warn">Pendente</span>`):""}
-      ${canSeeMoney()&&b.paid&&b.paymentNote?row("Obs. do pagamento",esc(b.paymentNote)):""}
+      ${S.me&&b.paid&&b.paymentNote?row("Obs. do pagamento",esc(b.paymentNote)):""}
       ${row("Situação",b.cancelled?`<span class="pill bad">Cancelada</span>`:st==="now"?"Hospedados agora":st==="past"?"Concluída":"Agendada")}
       ${b.cancelled?row("Cancelada em",`${dm(b.cancelledAt.slice(0,10))} · ${b.cancelDays?`${plural(b.cancelDays,"dia")} antes`:"no início"}`):""}
       ${b.cancelled&&b.cancelledBy?row("Cancelada por",esc(b.cancelledBy)):""}

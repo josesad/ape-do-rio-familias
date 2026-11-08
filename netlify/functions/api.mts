@@ -361,9 +361,9 @@ export default async (req: Request, _context: Context) => {
       const all = await listBookings()
       const out: any = {
         me: me ? { role: me.role, username: me.username, name: me.name } : null,
-        // visitante sem login não recebe nenhum dado financeiro
-        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxTotal: cfg.maxTotal ?? 2, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, maxDaysYear: cfg.maxDaysYear ?? 72, families: cfg.families },
-        bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
+        // visitante sem login vê o financeiro (só leitura), mas não recebe as observações de pagamento
+        config: me ? cfg : { dailyRate: cfg.dailyRate, saldoAnterior: cfg.saldoAnterior, allowOverlap: cfg.allowOverlap, maxTotal: cfg.maxTotal ?? 2, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, maxDaysYear: cfg.maxDaysYear ?? 72, families: cfg.families },
+        bookings: me ? all : all.map(({ paymentNote, ...rest }) => rest),
         newYear: await getNewYear(cfg),
         expenses: await listExpenses(),
         expenseTypes: await getExpenseTypes(),
