@@ -76,7 +76,7 @@ const EXP_DEFAULT=[
   ["ar-compra","Ar-condicionado (compra)","Compras","ac"],["microondas","Micro-ondas","Compras","microwave"],["airfryer","Air fryer","Compras","airfryer"],
   ["geladeira","Geladeira","Compras","fridge"],["fogao","Fogão","Compras","stove"],["ventilador","Ventilador","Compras","fan"],["tv","Televisão","Compras","tv"],
   ["chuveiro","Chuveiro","Compras","shower"],["copos","Copos","Compras","cup"],["pratos","Pratos","Compras","plate"],["talheres","Talheres","Compras","utensils"],
-  ["panelas","Panelas","Compras","pot"],["cama-banho","Roupa de cama e banho","Compras","bed"],["prod-limpeza","Produtos de limpeza","Compras","spray"],
+  ["panelas","Panelas","Compras","pot"],["cama-banho","Roupa de cama e banho","Compras","bed"],["prod-limpeza","Produtos de limpeza","Compras","spray"],["inseticida","Inseticida / insetização","Compras","bug"],
   ["lampadas","Lâmpadas","Compras","bulb"],["moveis","Móveis","Compras","sofa"],["utilidades","Utilidades da casa","Compras","box"],
   ["condominio","Condomínio","Contas","building"],["luz","Conta de luz","Contas","zap"],["agua","Conta de água","Contas","droplet"],
   ["gas-conta","Conta de gás","Contas","flame"],["iptu","IPTU","Contas","receipt"],["internet-mensal","Internet (mensalidade)","Contas","wifi"],
