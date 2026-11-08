@@ -59,6 +59,7 @@ const IC={
   tag:'<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.3"/>',
   box:'<path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>',
   filter:'<path d="M3.5 4.5h17l-6.5 8v6.2l-4 2.3v-8.5z"/>',
+  curtain:'<path d="M3 3.5h18"/><path d="M5 3.5v17c3-1.5 5-6 5.5-17"/><path d="M19 3.5v17c-3-1.5-5-6-5.5-17"/>',
   roller:'<rect x="3" y="3" width="15" height="6" rx="1.5"/><path d="M18 6h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-8v3"/><rect x="10.5" y="14" width="3" height="7" rx="1"/>',
   shower:'<path d="M4 21V7a4 4 0 0 1 8 0"/><path d="M8 7h8"/><path d="M10 11v.01M13 11v.01M16 11v.01M11.5 14v.01M14.5 14v.01M13 17v.01M16 17v.01"/>',
   inbox:'<path d="M3.5 13.5 6 5h12l2.5 8.5V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/>',
@@ -77,12 +78,12 @@ const EXP_DEFAULT=[
   ["geladeira","Geladeira","Compras","fridge"],["fogao","Fogão","Compras","stove"],["ventilador","Ventilador","Compras","fan"],["tv","Televisão","Compras","tv"],
   ["chuveiro","Chuveiro","Compras","shower"],["copos","Copos","Compras","cup"],["pratos","Pratos","Compras","plate"],["talheres","Talheres","Compras","utensils"],
   ["panelas","Panelas","Compras","pot"],["cama-banho","Roupa de cama e banho","Compras","bed"],["prod-limpeza","Produtos de limpeza","Compras","spray"],
-  ["lampadas","Lâmpadas","Compras","bulb"],["moveis","Móveis","Compras","sofa"],["utilidades","Utilidades da casa","Compras","box"],
+  ["lampadas","Lâmpadas","Compras","bulb"],["moveis","Móveis","Compras","sofa"],["cortinas","Cortinas","Compras","curtain"],["utilidades","Utilidades da casa","Compras","box"],
   ["condominio","Condomínio","Contas","building"],["luz","Conta de luz","Contas","zap"],["agua","Conta de água","Contas","droplet"],
   ["gas-conta","Conta de gás","Contas","flame"],["iptu","IPTU","Contas","receipt"],["internet-mensal","Internet (mensalidade)","Contas","wifi"],
   ["outros","Outros","Outros","tag"],
 ].map(([id,name,group,icon])=>({id,name,group,icon}));
-const EXP_ICONS=["hammer","wrench","filter","roller","ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","droplet","zap","sparkles","key","bug","fan","tv","shower","cup","plate","utensils","pot","bed","spray","bulb","sofa","box","building","receipt","cart","tag"];
+const EXP_ICONS=["hammer","wrench","filter","roller","curtain","ac","microwave","airfryer","fridge","stove","flame","heater","window","wifi","droplet","zap","sparkles","key","bug","fan","tv","shower","cup","plate","utensils","pot","bed","spray","bulb","sofa","box","building","receipt","cart","tag"];
 const expTypes=()=>[...EXP_DEFAULT,...(S.expenseTypes||[])];
 const expType=id=>expTypes().find(t=>t.id===id);
 
