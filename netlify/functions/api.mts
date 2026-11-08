@@ -13,7 +13,7 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 type Role = "admin" | "editor"
 
 interface Family { id: string; name: string; color: string; members: string[] }
-interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxTotal?: number; maxCommon?: number; maxHoliday?: number; maxNightsCommon?: number; maxNightsPeak?: number; saldoAnterior?: number }
+interface AppConfig { dailyRate: number; allowOverlap: boolean; families: Family[]; maxTotal?: number; maxCommon?: number; maxHoliday?: number; maxNightsCommon?: number; maxNightsPeak?: number; saldoAnterior?: number; maxDaysYear?: number }
 interface Account { role: Role; username: string; name: string; salt: string; hash: string; updatedAt: string }
 interface Booking {
   id: string; familyId: string; responsible: string; people?: number | null; guestNames: string
@@ -198,6 +198,11 @@ async function currentAccount(req: Request) {
 
 const nightsBetween = (a: string, b: string) =>
   Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000)
+/* diárias de uma estadia que caem no ano y (uma estadia na virada do ano conta parte em cada ano) */
+const nightsInYear = (a: string, b: string, y: number) => {
+  const s = a > `${y}-01-01` ? a : `${y}-01-01`, e = b < `${y + 1}-01-01` ? b : `${y + 1}-01-01`
+  return Math.max(0, nightsBetween(s, e))
+}
 
 async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | undefined, role: Role) {
   const fam = cfg.families.find((f) => f.id === input.familyId)
@@ -252,6 +257,26 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | un
         if (owner && owner !== fam.id) {
           const on = cfg.families.find((f) => f.id === owner)?.name ?? "outra família"
           return { error: `O Réveillon ${y} → ${y + 1} é da família ${on}, pela sequência. Para a família ${fam.name} ir, registre antes uma troca no quadro do Réveillon.` }
+        }
+      }
+    }
+  }
+
+  // Limite de diárias por família em cada ano (padrão 72). Conta todas as reservas
+  // não canceladas do ano, passadas e futuras. Chegar ao limite pode; passar, não.
+  {
+    const maxDays = cfg.maxDaysYear ?? 72
+    if (maxDays > 0) {
+      const y0 = +input.checkIn.slice(0, 4), y1 = +input.checkOut.slice(0, 4)
+      for (let y = y0; y <= y1; y++) {
+        const add = nightsInYear(input.checkIn, input.checkOut, y)
+        if (!add) continue
+        const used = all.filter((b) => b.id !== ignoreId && b.familyId === fam.id).reduce((s, b) => s + nightsInYear(b.checkIn, b.checkOut, y), 0)
+        if (used + add > maxDays) {
+          const left = Math.max(0, maxDays - used)
+          return { error: left
+            ? `A família ${fam.name} já usou ${used} de ${maxDays} diárias em ${y}. Restam ${left}, e esta estadia tem ${add} em ${y}.`
+            : `A família ${fam.name} já usou as ${maxDays} diárias de ${y}. Não é possível marcar mais neste ano.` }
         }
       }
     }
@@ -337,7 +362,7 @@ export default async (req: Request, _context: Context) => {
       const out: any = {
         me: me ? { role: me.role, username: me.username, name: me.name } : null,
         // visitante sem login não recebe nenhum dado financeiro
-        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxTotal: cfg.maxTotal ?? 2, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, families: cfg.families },
+        config: me ? cfg : { allowOverlap: cfg.allowOverlap, maxTotal: cfg.maxTotal ?? 2, maxCommon: cfg.maxCommon ?? 2, maxHoliday: cfg.maxHoliday ?? 2, maxNightsCommon: cfg.maxNightsCommon ?? 10, maxNightsPeak: cfg.maxNightsPeak ?? 6, maxDaysYear: cfg.maxDaysYear ?? 72, families: cfg.families },
         bookings: me ? all : all.map(({ amount, rate, paid, paidAt, paymentNote, ...rest }) => rest),
         newYear: await getNewYear(cfg),
         expenses: await listExpenses(),
@@ -540,6 +565,7 @@ export default async (req: Request, _context: Context) => {
         dailyRate: rate, allowOverlap: !!body.allowOverlap, families: clean,
         maxTotal: lim(body.maxTotal, cfg.maxTotal ?? 2), maxCommon: lim(body.maxCommon, cfg.maxCommon ?? 2), maxHoliday: lim(body.maxHoliday, cfg.maxHoliday ?? 2),
         maxNightsCommon: lim(body.maxNightsCommon, cfg.maxNightsCommon ?? 10), maxNightsPeak: lim(body.maxNightsPeak, cfg.maxNightsPeak ?? 6),
+        maxDaysYear: (() => { const n = Math.floor(Number(body.maxDaysYear ?? cfg.maxDaysYear ?? 72)); return n >= 0 && n <= 366 ? n : cfg.maxDaysYear ?? 72 })(),
         saldoAnterior: prevBal,
       }
       await store().setJSON("config", next)

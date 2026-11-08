@@ -171,6 +171,14 @@ function maxNightsFor(a,b,isHol){
   return{max:S.config.maxNightsCommon??10,why:"demais meses"};
 }
 const quotaTxt=(n,lim)=>lim>0?`${n}/${lim}`:`${n}`;
+/* limite de diárias por família em cada ano (padrão 72): conta reservas não canceladas, passadas e futuras */
+const maxDaysYear=()=>S.config.maxDaysYear??72;
+const nightsInYear=(a,b,y)=>{const s=a>`${y}-01-01`?a:`${y}-01-01`,e=b<`${y+1}-01-01`?b:`${y+1}-01-01`;return Math.max(0,nights(s,e))};
+const daysUsed=(famId,y,ignoreId)=>S.bookings.filter(b=>b.familyId===famId&&b.id!==ignoreId).reduce((s,b)=>s+nightsInYear(b.checkIn,b.checkOut,y),0);
+/* primeiro ano em que a estadia passaria do limite, ou null */
+function daysOver(famId,a,b,ignoreId){const max=maxDaysYear();if(!(max>0))return null;
+  for(let y=+a.slice(0,4);y<=+b.slice(0,4);y++){const add=nightsInYear(a,b,y);if(!add)continue;const used=daysUsed(famId,y,ignoreId);if(used+add>max)return{y,used,add,max}}
+  return null}
 
 /* ---------- Réveillon: sequência entre as famílias ----------
    Ano Y = Réveillon da noite de 31/12/Y para 01/01/(Y+1). A vez segue a ordem a cada ano;
@@ -397,7 +405,7 @@ function renderPainel(v){
     const bs=S.bookings.filter(b=>b.familyId===f.id),o=openOf(f.id),L=limits();
     const q=(n,lim)=>`<div class="c num ${lim>0&&n>=lim?"full":""}">${quotaTxt(n,lim)}</div>`;
     return `<div class="n" style="--fc:${f.color}"><i class="dot"></i><span>${esc(f.name)}</span></div>
-      <div class="c num">${bs.length}</div>${q(o.all.length,L.total)}${q(o.hol.length,L.hol)}`;
+      <div class="c num">${bs.length}</div>${q(o.all.length,L.total)}${q(daysUsed(f.id,+t.slice(0,4)),maxDaysYear())}`;
   }).join("");
 
   v.innerHTML=`
@@ -415,10 +423,10 @@ function renderPainel(v){
     <section class="sec">
       <div class="sec-head"><h2>Por família</h2></div>
       <div class="card ftable">
-        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Futuras em aberto</div><div class="h c">Feriados em aberto</div>
+        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Futuras em aberto</div><div class="h c">Dias em ${t.slice(0,4)}</div>
         ${rows}
       </div>
-      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().total||"∞"} marcações futuras em aberto (no máximo ${limits().common||"∞"} de tempo comum e ${limits().hol||"∞"} de feriado). A vaga é liberada quando a estadia termina. Cada estadia pode ter até ${(S.config.maxNightsCommon??10)||"∞"} diárias (${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho).</span></p>
+      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().total||"∞"} marcações futuras em aberto (no máximo ${limits().common||"∞"} de tempo comum e ${limits().hol||"∞"} de feriado). A vaga é liberada quando a estadia termina. Cada estadia pode ter até ${(S.config.maxNightsCommon??10)||"∞"} diárias (${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho).${maxDaysYear()>0?` No ano, cada família pode usar até ${maxDaysYear()} dias (diárias); ao chegar nesse total, não marca mais naquele ano.`:""}</span></p>
     </section>
     <section class="sec">
       <div class="sec-head"><h2>Próximas estadias</h2><button class="link" data-go="reservas">Ver todas ${ic("right",16)}</button></div>
@@ -721,6 +729,8 @@ function renderAdmin(v){
             <label class="field"><span>Máx. de diárias: jan. e jul.</span><input type="number" min="0" max="50" step="1" id="cfgMaxNightsPeak" value="${c.maxNightsPeak??6}" inputmode="numeric"></label>
           </div>
           <p class="muted">Vale para qualquer estadia, com ou sem feriado. Em janeiro e julho vale o limite menor. Use 0 para não limitar.</p>
+          <label class="field"><span>Máx. de dias (diárias) por família no ano</span><input type="number" min="0" max="366" step="1" id="cfgMaxDaysYear" value="${maxDaysYear()}" inputmode="numeric"></label>
+          <p class="muted">Soma todas as reservas da família no ano, já feitas e futuras. Ao chegar nesse total, ela não marca mais naquele ano. Use 0 para não limitar.</p>
           <label class="check"><input type="checkbox" id="cfgOverlap" ${c.allowOverlap?"checked":""}>Permitir duas famílias no mesmo período</label>
           <p class="muted">A nova diária vale só para reservas feitas depois da mudança.</p>
           <label class="field"><span>Saldo dos anos anteriores (R$)</span><input type="number" step="0.01" id="cfgSaldoAnt" value="${saldoAnterior()}" inputmode="decimal"></label>
@@ -784,7 +794,7 @@ function renderAdmin(v){
     </section>`;
 
   $("#saveCfg").onclick=async()=>{
-    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),maxTotal:Number($("#cfgMaxTotal").value),maxCommon:Number($("#cfgMaxCommon").value),maxHoliday:Number($("#cfgMaxHoliday").value),maxNightsCommon:Number($("#cfgMaxNightsCommon").value),maxNightsPeak:Number($("#cfgMaxNightsPeak").value),saldoAnterior:Number($("#cfgSaldoAnt").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança e regras salvas");await refresh()}catch(e){toast(e.message,"info")}
+    try{await api("config",{method:"PUT",body:{...S.config,dailyRate:Number($("#cfgRate").value),maxTotal:Number($("#cfgMaxTotal").value),maxCommon:Number($("#cfgMaxCommon").value),maxHoliday:Number($("#cfgMaxHoliday").value),maxNightsCommon:Number($("#cfgMaxNightsCommon").value),maxNightsPeak:Number($("#cfgMaxNightsPeak").value),maxDaysYear:Number($("#cfgMaxDaysYear").value),saldoAnterior:Number($("#cfgSaldoAnt").value),allowOverlap:$("#cfgOverlap").checked}});toast("Cobrança e regras salvas");await refresh()}catch(e){toast(e.message,"info")}
   };
   const readFams=()=>$$("#famEdit [data-i]").map(el=>{
     const f=S.config.families[+el.dataset.i]||{};
@@ -942,6 +952,7 @@ function openBooking(b=null,startDay=null){
       <div class="hol-note hidden" id="bkHol"></div>
       <div class="rule-warn hidden" id="bkRule"></div>
       <div class="rule-warn hidden" id="bkLen"></div>
+      <div class="rule-warn hidden" id="bkDays"></div>
       <div class="rule-warn hidden" id="bkNY"></div>
       <div class="total"><div><small>Valor a pagar</small><span id="bkCalc"></span></div><b class="num" id="bkTotal"></b></div>
       <button class="btn full" id="bkSave">${b?"Salvar alterações":"Confirmar reserva"}</button>
@@ -982,7 +993,12 @@ function openBooking(b=null,startDay=null){
     if(n>0&&famId){const bad=nyYearsIn(vi,vo).find(y=>{const o=nyOwner(y);return o&&o!==famId});
       if(bad!==undefined){nyBlocked=true;nyEl.innerHTML=ic("star",18,2)+`<span>O Réveillon ${nyLabel(bad)} é da família ${esc(fam(nyOwner(bad)).name)}, pela sequência. Para ${esc(fam(famId).name)} ir, registre antes uma troca no quadro do Réveillon, no Painel.</span>`}}
     nyEl.classList.toggle("hidden",!nyBlocked);
-    $("#bkSave").disabled=qBlocked||lBlocked||nyBlocked;
+    /* limite de dias por família no ano */
+    const dEl=$("#bkDays"),ov=n>0&&famId?daysOver(famId,vi,vo,b?.id):null;
+    dEl.classList.toggle("hidden",!ov);
+    if(ov){const left=Math.max(0,ov.max-ov.used);
+      dEl.innerHTML=ic("info",18,2)+`<span>${left?`A família ${esc(fam(famId).name)} já usou ${ov.used} de ${ov.max} dias em ${ov.y}. Restam ${left}, e esta estadia tem ${ov.add} em ${ov.y}. Escolha um período menor.`:`A família ${esc(fam(famId).name)} já usou os ${ov.max} dias de ${ov.y}. Não é possível marcar mais neste ano.`}</span>`}
+    $("#bkSave").disabled=qBlocked||lBlocked||nyBlocked||!!ov;
   };
   /* vagas da família e aviso da regra de marcações */
   const rules=isHol=>{
@@ -990,7 +1006,7 @@ function openBooking(b=null,startDay=null){
     if(!famId){qEl.classList.add("hidden");wEl.classList.add("hidden");return false}
     const o=openOf(famId,b?.id),cf=L.common>0&&o.common.length>=L.common,hf=L.hol>0&&o.hol.length>=L.hol,tf=L.total>0&&o.all.length>=L.total;
     qEl.classList.remove("hidden");
-    qEl.innerHTML=`<span class="muted" style="align-self:center">Em aberto:</span><span class="qchip ${tf?"full":""}">Total ${quotaTxt(o.all.length,L.total)}</span><span class="qchip ${cf?"full":""} ${isHol===false?"cur":""}">Tempo comum ${quotaTxt(o.common.length,L.common)}</span><span class="qchip ${hf?"full":""} ${isHol===true?"cur":""}">Feriados ${quotaTxt(o.hol.length,L.hol)}</span>`;
+    qEl.innerHTML=`<span class="muted" style="align-self:center">Em aberto:</span><span class="qchip ${tf?"full":""}">Total ${quotaTxt(o.all.length,L.total)}</span><span class="qchip ${cf?"full":""} ${isHol===false?"cur":""}">Tempo comum ${quotaTxt(o.common.length,L.common)}</span><span class="qchip ${hf?"full":""} ${isHol===true?"cur":""}">Feriados ${quotaTxt(o.hol.length,L.hol)}</span>${(()=>{const y=+($("#bkIn").value||today()).slice(0,4),u=daysUsed(famId,y,b?.id),m=maxDaysYear();return m>0?`<span class="qchip ${u>=m?"full":""}">Dias em ${y} ${quotaTxt(u,m)}</span>`:""})()}`;
     /* limite total: bloqueia assim que a família é escolhida */
     if(tf){const list=o.all.map(x=>range(x.checkIn,x.checkOut)).join(" e "),free=o.all.map(x=>x.checkOut).sort()[0];
       wEl.classList.remove("hidden");
