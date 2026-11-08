@@ -1026,7 +1026,10 @@ function openBooking(b=null,startDay=null){
   const busy=new Map();
   if(!S.config.allowOverlap) S.bookings.forEach(x=>{if(b&&x.id===b.id)return;for(let d=x.checkIn;d<x.checkOut;d=addDays(d,1))busy.set(d,x.familyId)});
   let rpSel={a:data.checkIn||"",b:data.checkOut||""},rpMsg="";
-  const f0=parse(rpSel.a||today());let rpM={y:f0.getFullYear(),m:f0.getMonth()};
+  /* nova reserva aberta já com uma data que está ocupada (ex.: tocando no calendário): começa sem período */
+  if(!b&&rpSel.a){let hit=busy.has(rpSel.a);if(rpSel.b)for(let d=rpSel.a;d<rpSel.b&&!hit;d=addDays(d,1))hit=busy.has(d);
+    if(hit){rpSel={a:"",b:""};$("#bkIn").value="";$("#bkOut").value="";rpMsg="O dia escolhido já está reservado. Toque em um dia livre para a entrada."}}
+  const f0=parse(rpSel.a||data.checkIn||today());let rpM={y:f0.getFullYear(),m:f0.getMonth()};
   const drawRP=()=>{
     const {y,m}=rpM,first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),t=today();
     const title=first.toLocaleDateString("pt-BR",{month:"long"});
