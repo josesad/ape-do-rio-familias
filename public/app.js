@@ -205,7 +205,7 @@ function newYearSection(){
     :`<span class="pill warn">Ainda não marcou</span><span>${cy===+today().slice(0,4)&&today()>`${cy}-12-31`?"":"A família da vez pode marcar a qualquer momento."}</span>`;
   const rows=[];
   for(let y=cy-2;y<=cy+4;y++){
-    if(y<ny.anchorYear) continue;
+    if(y<ny.anchorYear&&!nySwapOf(y)) continue;
     const o=nyOwner(y),fo=fam(o),b=nyBooking(y),s=nySwapOf(y);
     let st;
     if(y<cy) st=b?`<span class="pill ok">Foi${b.familyId!==o?": "+esc(fam(b.familyId).name):""}</span>`:y<ny.sinceYear?`<span class="pill ok">Foi</span>`:`<span class="pill mute">Não foi · perdeu a vez</span>`;
@@ -216,7 +216,7 @@ function newYearSection(){
       <span class="nm"><i class="dot"></i><span>${esc(fo.name)}</span>${s?`<span class="pill hot" title="Troca registrada">troca</span>`:""}</span>
       <span class="ny-side">${st}</span></div>`);
   }
-  const swaps=ny.swaps.filter(s=>s.b>=cy).map(s=>`<div class="ny-swap">${ic("undo",16)}<span><b>${nyLabel(s.a)}</b> ↔ <b>${nyLabel(s.b)}</b>: ${esc(fam(s.famA).name)} e ${esc(fam(s.famB).name)} trocaram${s.by?` · por ${esc(s.by)}`:""}</span>${isAdmin()?`<button class="btn danger sm" data-unswap="${s.id}">Desfazer</button>`:""}</div>`).join("");
+  const swaps=ny.swaps.map(s=>`<div class="ny-swap">${ic("undo",16)}<span><b>${nyLabel(s.a)}</b> ↔ <b>${nyLabel(s.b)}</b>: ${esc(fam(s.famA).name)} e ${esc(fam(s.famB).name)} trocaram${s.by?` · por ${esc(s.by)}`:""}</span>${isAdmin()?`<button class="btn danger sm" data-unswap="${s.id}">Desfazer</button>`:""}</div>`).join("");
   const seq=ny.order.map(id=>esc(fam(id).name)).join(" → ");
   return `<section class="sec">
     <div class="sec-head"><h2>Réveillon</h2>${S.me?`<button class="link" id="nySwapBtn">${ic("undo",16)} Registrar troca</button>`:""}</div>
@@ -240,10 +240,14 @@ function bindNewYear(v){
   }));
 }
 function openSwap(){
-  const cy=curNY(),years=[];for(let y=cy;y<=cy+6;y++)years.push(y);
-  const opt=sel=>years.map(y=>`<option value="${y}" ${y===sel?"selected":""}>${nyLabel(y)} · ${esc(fam(nyOwner(y)).name)}</option>`).join("");
+  const cy=curNY(),past=[],next=[];
+  for(let y=cy-10;y<cy;y++)past.push(y);
+  for(let y=cy;y<=cy+6;y++)next.push(y);
+  const o=(y,sel)=>`<option value="${y}" ${y===sel?"selected":""}>${nyLabel(y)} · ${esc(fam(nyOwner(y)).name)}</option>`;
+  const opt=sel=>(past.length?`<optgroup label="Já passaram">${past.map(y=>o(y,sel)).join("")}</optgroup>`:"")
+    +`<optgroup label="Próximos">${next.map(y=>o(y,sel)).join("")}</optgroup>`;
   openSheet(`${sheetHead("Registrar troca do Réveillon")}
-    <p class="muted" style="font-size:14px">As duas famílias trocam de ano entre si. É a única forma de uma família ir fora da ordem.</p>
+    <p class="muted" style="font-size:14px">As duas famílias trocam de ano entre si. É a única forma de uma família ir fora da ordem. Dá para usar Réveillons que já passaram, para registrar uma troca que já aconteceu.</p>
     <div class="form">
       <div id="swErr" class="err hidden"></div>
       <label class="field"><span>Réveillon</span><select id="swA">${opt(cy)}</select></label>

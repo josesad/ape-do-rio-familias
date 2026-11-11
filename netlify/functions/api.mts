@@ -433,11 +433,13 @@ export default async (req: Request, _context: Context) => {
       const ny = await getNewYear(cfg)
       const a = Math.floor(Number(body.a)), b = Math.floor(Number(body.b))
       const cur = +todayBR().slice(0, 4)
-      if (!(a >= cur && b >= cur && a <= cur + 20 && b <= cur + 20)) return fail("Escolha anos de Réveillon que ainda não passaram.")
+      /* anos passados também valem: serve para registrar trocas que já aconteceram */
+      if (!(a >= cur - 10 && b >= cur - 10 && a <= cur + 20 && b <= cur + 20)) return fail("Escolha anos de Réveillon entre os últimos 10 e os próximos 20.")
       if (a === b) return fail("Escolha dois anos diferentes.")
       const owners = nyOwners(ny, [a, b])
       if (owners[a] === owners[b]) return fail("Esses dois anos já são da mesma família.")
-      const booked = (await activeBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === a || y === b))
+      /* reserva só bloqueia nos Réveillons que ainda não passaram; nos passados a reserva é o próprio histórico */
+      const booked = (await activeBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y >= cur && (y === a || y === b)))
       if (booked) return fail(`Já existe reserva no Réveillon ${nyYearsIn(booked.checkIn, booked.checkOut)[0]}. Cancele a reserva antes de registrar a troca.`)
       const swap: Swap = { id: randomBytes(4).toString("hex"), a: Math.min(a, b), b: Math.max(a, b),
         famA: owners[Math.min(a, b)], famB: owners[Math.max(a, b)], by: me.name, at: now() }
@@ -530,7 +532,8 @@ export default async (req: Request, _context: Context) => {
       const ny = await getNewYear(cfg)
       const s = ny.swaps.find((x) => x.id === action)
       if (!s) return fail("Troca não encontrada.", 404)
-      const booked = (await activeBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y === s.a || y === s.b))
+      const cur = +todayBR().slice(0, 4)
+      const booked = (await activeBookings()).find((x) => nyYearsIn(x.checkIn, x.checkOut).some((y) => y >= cur && (y === s.a || y === s.b)))
       if (booked) return fail("Já existe reserva num desses Réveillons. Cancele a reserva antes de desfazer a troca.")
       const next = { ...ny, swaps: ny.swaps.filter((x) => x.id !== action) }
       await store().setJSON("newyear", next)
