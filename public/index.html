@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF">
 <title>Apê do Rio</title>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -39,6 +39,8 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+html,body{touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+*{touch-action:manipulation}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none;text-align:inherit}
 h1,h2,h3,h4{font-weight:700;letter-spacing:-.015em;text-wrap:balance}
@@ -417,6 +419,11 @@ input[type=date]{min-width:0}
   <button class="fab hidden" id="fab"></button>
 </div>
 
+<script>
+/* Sem zoom: bloqueia pinça no iPhone (toque duplo já é bloqueado pelo touch-action no CSS) */
+["gesturestart","gesturechange","gestureend"].forEach(function(t){document.addEventListener(t,function(e){e.preventDefault()},{passive:false})});
+document.addEventListener("touchmove",function(e){if(e.touches.length>1)e.preventDefault()},{passive:false});
+</script>
 <script src="/app.js"></script>
 </body>
 </html>
