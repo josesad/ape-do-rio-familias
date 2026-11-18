@@ -409,7 +409,7 @@ function renderPainel(v){
     const bs=S.bookings.filter(b=>b.familyId===f.id),o=openOf(f.id),L=limits();
     const q=(n,lim)=>`<div class="c num ${lim>0&&n>=lim?"full":""}">${quotaTxt(n,lim)}</div>`;
     return `<div class="n" style="--fc:${f.color}"><i class="dot"></i><span>${esc(f.name)}</span></div>
-      <div class="c num">${bs.length}</div>${q(o.all.length,L.total)}${q(daysUsed(f.id,+t.slice(0,4)),maxDaysYear())}`;
+      <div class="c num">${bs.length}</div>${q(o.all.length,L.total)}${q(daysUsed(f.id,+t.slice(0,4)),maxDaysYear())}${q(daysUsed(f.id,+t.slice(0,4)+1),maxDaysYear())}`;
   }).join("");
 
   v.innerHTML=`
@@ -427,10 +427,10 @@ function renderPainel(v){
     <section class="sec">
       <div class="sec-head"><h2>Por família</h2></div>
       <div class="card ftable">
-        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Futuras em aberto</div><div class="h c">Dias em ${t.slice(0,4)}</div>
+        <div class="h n">Família</div><div class="h c">Reservas no total</div><div class="h c">Futuras em aberto</div><div class="h c">Dias em ${t.slice(0,4)}</div><div class="h c">Dias em ${+t.slice(0,4)+1}</div>
         ${rows}
       </div>
-      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().total||"∞"} marcações futuras em aberto (no máximo ${limits().common||"∞"} de tempo comum e ${limits().hol||"∞"} de feriado). A vaga é liberada quando a estadia termina. Cada estadia pode ter até ${(S.config.maxNightsCommon??10)||"∞"} diárias (${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho).${maxDaysYear()>0?` No ano, cada família pode usar até ${maxDaysYear()} dias (diárias); ao chegar nesse total, não marca mais naquele ano.`:""}</span></p>
+      <p class="muted" style="display:flex;gap:6px;align-items:flex-start">${ic("info",16)}<span>Cada família pode ter até ${limits().total||"∞"} marcações futuras em aberto (no máximo ${limits().common||"∞"} de tempo comum e ${limits().hol||"∞"} de feriado). A vaga é liberada quando a estadia termina. Cada estadia pode ter até ${(S.config.maxNightsCommon??10)||"∞"} diárias (${(S.config.maxNightsPeak??6)||"∞"} em janeiro e julho).${maxDaysYear()>0?` No ano, cada família pode usar até ${maxDaysYear()} dias (diárias); ao chegar nesse total, não marca mais naquele ano. A contagem de cada ano é separada: as diárias são somadas no ano em que caem, e o total zera quando o ano vira.`:""}</span></p>
     </section>
     <section class="sec">
       <div class="sec-head"><h2>Próximas estadias</h2><button class="link" data-go="reservas">Ver todas ${ic("right",16)}</button></div>
