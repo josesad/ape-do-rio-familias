@@ -507,7 +507,10 @@ export default async (req: Request, _context: Context) => {
         const v = await validateBooking(body, cfg, id, me.role)
         if (v.error) return fail(v.error)
         const rate = existing.rate ?? cfg.dailyRate
-        const upd: Booking = { ...existing, ...v.data!, rate, amount: v.data!.nights * rate, updatedAt: now() }
+        const amount = v.data!.nights * rate
+        const upd: Booking = { ...existing, ...v.data!, rate, amount, updatedAt: now() }
+        // reserva já paga cujo valor mudou com a alteração: o pagamento volta para pendente
+        if (existing.paid && amount !== existing.amount) { upd.paid = false; upd.paidAt = null; upd.paymentNote = "" }
         await store().setJSON(`bookings/${id}`, upd)
         return json(upd)
       }

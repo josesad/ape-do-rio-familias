@@ -962,6 +962,7 @@ function openBooking(b=null,startDay=null){
       <div class="rule-warn hidden" id="bkLen"></div>
       <div class="rule-warn hidden" id="bkDays"></div>
       <div class="rule-warn hidden" id="bkNY"></div>
+      <div class="chg hidden" id="bkChg"></div>
       <div class="total"><div><small>Valor a pagar</small><span id="bkCalc"></span></div><b class="num" id="bkTotal"></b></div>
       <button class="btn full" id="bkSave">${b?"Salvar alterações":"Confirmar reserva"}</button>
     </div>`);
@@ -1007,6 +1008,23 @@ function openBooking(b=null,startDay=null){
     if(ov){const left=Math.max(0,ov.max-ov.used);
       dEl.innerHTML=ic("info",18,2)+`<span>${left?`A família ${esc(fam(famId).name)} já usou ${ov.used} de ${ov.max} dias em ${ov.y}. Restam ${left}, e esta estadia tem ${ov.add} em ${ov.y}. Escolha um período menor.`:`A família ${esc(fam(famId).name)} já usou os ${ov.max} dias de ${ov.y}. Não é possível marcar mais neste ano.`}</span>`}
     $("#bkSave").disabled=qBlocked||lBlocked||nyBlocked||!!ov;
+    showChange(vi,vo,n);
+  };
+  /* ao editar: o que muda em relação à reserva original (diárias, valor e dias no ano) */
+  const showChange=(vi,vo,n)=>{
+    const el=$("#bkChg");
+    if(!b||!(n>0)||(vi===b.checkIn&&vo===b.checkOut&&famId===b.familyId)){el.classList.add("hidden");return}
+    const dn=n-b.nights,amt=n*rate,sg=x=>x>0?`+${x}`:`${x}`;
+    const li=[`<li><span>Período</span><b>${range(b.checkIn,b.checkOut)} → ${range(vi,vo)}</b></li>`,
+      `<li><span>Diárias</span><b>${b.nights} → ${n}${dn?` <em>(${sg(dn)})</em>`:""}</b></li>`];
+    if(canSeeMoney()) li.push(`<li><span>Valor</span><b>${money(b.amount)} → ${money(amt)}${amt!==b.amount?` <em>(${amt>b.amount?"+":"−"}${money(Math.abs(amt-b.amount))})</em>`:""}</b></li>`);
+    const m=maxDaysYear();
+    if(famId){const ys=new Set();[b.checkIn,b.checkOut,vi,vo].forEach(d=>ys.add(+d.slice(0,4)));
+      [...ys].sort().forEach(y=>{const base=daysUsed(famId,y,b.id),bef=base+(famId===b.familyId?nightsInYear(b.checkIn,b.checkOut,y):0),aft=base+nightsInYear(vi,vo,y);
+        if(bef!==aft) li.push(`<li><span>Dias em ${y}${famId===b.familyId?"":` (${esc(fam(famId).name)})`}</span><b>${bef} → ${aft}${m>0?` de ${m}`:""}</b></li>`)})}
+    const payNote=b.paid&&amt!==b.amount?`<p>${ic("info",16)}<span>Esta reserva já estava paga (${money(b.amount)}). Com o novo valor, o pagamento volta para <b>pendente</b> e precisa ser registrado de novo.</span></p>`:"";
+    el.innerHTML=`<h4>${ic("edit",16)}O que muda</h4><ul>${li.join("")}</ul>${payNote}`;
+    el.classList.remove("hidden");
   };
   /* vagas da família e aviso da regra de marcações */
   const rules=isHol=>{
@@ -1099,7 +1117,7 @@ function openBooking(b=null,startDay=null){
       if(miss.length) throw new Error(`Preencha os campos obrigatórios: ${miss.join(", ")}.`);
       if(body.checkOut<=body.checkIn){$("#fPeriod").classList.add("invalid");throw new Error("A saída precisa ser depois da entrada.")}
       if(b) await api("bookings/"+b.id,{method:"PUT",body}); else await api("bookings",{method:"POST",body});
-      closeSheet();toast(b?"Reserva atualizada":"Reserva confirmada");await refresh();
+      closeSheet();toast(b?(b.paid&&nights(body.checkIn,body.checkOut)*rate!==b.amount?"Reserva atualizada · pagamento voltou para pendente":"Reserva atualizada"):"Reserva confirmada");await refresh();
     }catch(e){$("#bkErr").textContent=e.message;$("#bkErr").classList.remove("hidden");$(".sheet").scrollTo({top:0,behavior:"smooth"});btn.disabled=false}
   };
 }
