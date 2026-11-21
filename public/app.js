@@ -1,3 +1,7 @@
+/* Sem zoom: bloqueia pinça no iPhone (toque duplo já é bloqueado pelo touch-action no CSS).
+   Fica aqui, e não num <script> dentro do HTML, porque a política de segurança (CSP) só roda scripts de arquivo. */
+["gesturestart","gesturechange","gestureend"].forEach(function(t){document.addEventListener(t,function(e){e.preventDefault()},{passive:false})});
+document.addEventListener("touchmove",function(e){if(e.touches.length>1)e.preventDefault()},{passive:false});
 /* =========================================================
    Ícones (traço fino)
    ========================================================= */
@@ -300,7 +304,7 @@ async function api(path,opts={}){
   const res=await fetch("/api/"+path,{method:opts.method||"GET",
     headers:{"content-type":"application/json",...(S.token?{authorization:"Bearer "+S.token}:{})},
     body:opts.body?JSON.stringify(opts.body):undefined});
-  const data=await res.json().catch(()=>({error:"Sem conexão. Verifique a internet e tente de novo."}));
+  const data=await res.json().catch(()=>({error:res.status===429?"Muitos pedidos seguidos. Espere um minuto e tente de novo.":"Sem conexão. Verifique a internet e tente de novo."}));
   if(res.status===401&&path!=="login"){setToken(null);closeSheet();await refresh();throw new Error(data.error||"Sessão expirada. Entre de novo.")}
   if(!res.ok) throw new Error(data.error||"Algo deu errado.");
   return data;
@@ -1089,7 +1093,7 @@ function openBooking(b=null,startDay=null){
   const pickRP=s=>{
     rpMsg="";
     if(!rpSel.a||rpSel.b||s<=rpSel.a){
-      if(busy.has(s)){rpMsg=`Esse dia já está reservado para ${fam(busy.get(s)).name}. Escolha outro dia de entrada.`;drawRP();return}
+      if(busy.has(s)){rpMsg=`Esse dia já está reservado para ${esc(fam(busy.get(s)).name)}. Escolha outro dia de entrada.`;drawRP();return}
       rpSel={a:s,b:""};
     }else{
       let clash=false;for(let d=rpSel.a;d<s;d=addDays(d,1))if(busy.has(d)){clash=true;break}
@@ -1149,7 +1153,7 @@ function openMe(){
     <div class="form">
       <div id="mErr" class="err hidden"></div>
       <label class="field"><span>Senha atual</span><input type="password" id="mCur" autocomplete="current-password"></label>
-      <label class="field"><span>Nova senha</span><input type="password" id="mNew" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></label>
+      <label class="field"><span>Nova senha</span><input type="password" id="mNew" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></label>
       <button class="btn full" id="mSave">${ic("lock",18)}Trocar senha</button>
       <button class="btn ghost full" id="mOut">${ic("logout",18)}Sair</button>
     </div>`);
@@ -1167,12 +1171,13 @@ function openAccount(a){
       <div id="uErr" class="err hidden"></div>
       <label class="field"><span>Nome que aparece</span><input id="uName" value="${esc(a.name)}" placeholder="${a.role==="admin"?"Ex.: José":"Ex.: Tia Cleia"}"></label>
       <label class="field"><span>Usuário</span><input id="uUser" value="${esc(a.username)}" autocapitalize="none" placeholder="ex.: editor"></label>
-      <label class="field"><span>${a.active?"Nova senha":"Senha"}</span><input id="uPass" type="text" autocomplete="new-password" placeholder="${a.active?"Deixe vazio para manter a atual":"Mínimo 6 caracteres"}"></label>
+      <label class="field"><span>${a.active?"Nova senha":"Senha"}</span><input id="uPass" type="password" autocomplete="new-password" placeholder="${a.active?"Deixe vazio para manter a atual":"Mínimo 8 caracteres"}"></label>
+      ${a.role==="admin"?`<label class="field"><span>Sua senha atual (para mudar usuário ou senha)</span><input id="uCur" type="password" autocomplete="current-password"></label>`:""}
       <p class="muted">Use letras minúsculas, sem espaço nem acento. Ao trocar a senha, quem estava conectado com a antiga é desconectado.</p>
       <button class="btn full" id="uSave">Salvar login</button>
     </div>`);
   $("#uSave").onclick=async()=>{
-    try{const d=await api("accounts/"+a.role,{method:"PUT",body:{name:$("#uName").value,username:$("#uUser").value,password:$("#uPass").value}});
+    try{const d=await api("accounts/"+a.role,{method:"PUT",body:{name:$("#uName").value,username:$("#uUser").value,password:$("#uPass").value,current:$("#uCur")?.value||""}});
       if(d.token)setToken(d.token);closeSheet();toast("Login atualizado");await refresh()}
     catch(e){$("#uErr").textContent=e.message;$("#uErr").classList.remove("hidden")}
   };

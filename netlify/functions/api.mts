@@ -49,8 +49,24 @@ const SEED: Record<Role, { username: string; name: string; env: string }> = {
 }
 
 const store = () => getStore({ name: "apto-rio", consistency: "strong" })
-const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "cache-control": "no-store" } })
-const fail = (msg: string, status = 400) => json({ error: msg }, status)
+/* Cabeçalhos de segurança das respostas da API (os do netlify.toml só valem para os arquivos estáticos). */
+const SEC_HEADERS: Record<string, string> = {
+  "cache-control": "no-store",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "same-origin",
+  "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+  "cross-origin-resource-policy": "same-origin",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+}
+const json = (data: unknown, status = 200, extra: Record<string, string> = {}) =>
+  Response.json(data, { status, headers: { ...SEC_HEADERS, ...extra } })
+const fail = (msg: string, status = 400, extra: Record<string, string> = {}) => json({ error: msg }, status, extra)
+/** ids gerados pelo sistema (reservas, despesas, trocas, tipos): só letras, números e traço */
+const ID_RE = /^[a-z0-9-]{1,64}$/i
+/** tamanho máximo do corpo de uma requisição (a maior é a de famílias, bem menor que isso) */
+const MAX_BODY = 64 * 1024
+const MIN_PASSWORD = 8
 const now = () => new Date().toISOString()
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const br = (d: string) => d.split("-").reverse().join("/")
@@ -91,10 +107,17 @@ function hashPassword(password: string, salt = randomBytes(16).toString("hex")) 
   return { salt, hash: scryptSync(password, salt, 64).toString("hex") }
 }
 function checkPassword(password: string, acc: Account) {
-  const a = Buffer.from(scryptSync(password, acc.salt, 64).toString("hex"))
+  const a = Buffer.from(scryptSync(password.slice(0, 200), acc.salt, 64).toString("hex"))
   const b = Buffer.from(acc.hash)
   return a.length === b.length && timingSafeEqual(a, b)
 }
+/** compara dois textos em tempo constante (não revela, pelo tempo de resposta, quantos caracteres batem) */
+function safeEqual(a: string, b: string) {
+  const ha = createHmac("sha256", "cmp").update(a).digest(), hb = createHmac("sha256", "cmp").update(b).digest()
+  return timingSafeEqual(ha, hb)
+}
+/* hash fictício: quando o usuário não existe, ainda roda o scrypt para o tempo de resposta não denunciar isso */
+const DUMMY: Account = { role: "editor", username: "", name: "", salt: "0".repeat(32), hash: "0".repeat(128), updatedAt: "" }
 function secret() {
   const s = Netlify.env.get("AUTH_SECRET")
   if (!s) throw new Error("AUTH_SECRET não configurado")
@@ -115,8 +138,31 @@ function verify(token: string): { r: Role; h: string; exp: number } | null {
     return p.exp > Date.now() ? p : null
   } catch { return null }
 }
-// o token fica inválido quando a senha da conta muda (h = pedaço do hash)
-const tokenFor = (acc: Account) => sign({ r: acc.role, h: acc.hash.slice(0, 16), exp: Date.now() + 60 * 86400000 })
+/* O token fica inválido quando a senha ou o usuário da conta mudam. "h" é uma impressão digital
+   (HMAC) do hash, para o token não carregar nenhum pedaço do hash da senha. */
+const fingerprint = (acc: Account) => createHmac("sha256", secret()).update(`fp:${acc.username}:${acc.hash}`).digest("base64url").slice(0, 22)
+const TOKEN_DAYS = 30
+const tokenFor = (acc: Account) => sign({ r: acc.role, h: fingerprint(acc), exp: Date.now() + TOKEN_DAYS * 86400000 })
+
+/* ---------- proteção do login contra robôs (força bruta) ----------
+   Conta as tentativas erradas em janelas de 15 minutos:
+   - por IP: 8 erros → bloqueia aquele IP por 15 min;
+   - por usuário: 25 erros (vindos de qualquer lugar) → bloqueia o login daquele usuário por 15 min.
+   O IP não é guardado: só um HMAC dele (privacidade). */
+const LOGIN_WINDOW = 15 * 60 * 1000
+const MAX_FAIL_IP = 8
+const MAX_FAIL_USER = 25
+interface Attempts { n: number; start: number }
+const attemptKey = (kind: string, v: string) => `ratelimit/${kind}/${createHmac("sha256", secret()).update(`${kind}:${v}`).digest("hex").slice(0, 32)}`
+async function readAttempts(key: string): Promise<Attempts> {
+  const a = (await store().get(key, { type: "json" })) as Attempts | null
+  return a && Date.now() - a.start < LOGIN_WINDOW ? a : { n: 0, start: Date.now() }
+}
+async function addAttempt(key: string) {
+  const a = await readAttempts(key)
+  await store().setJSON(key, { n: a.n + 1, start: a.start })
+}
+const minutesLeft = (a: Attempts) => Math.max(1, Math.ceil((a.start + LOGIN_WINDOW - Date.now()) / 60000))
 
 /* ---------- dados ---------- */
 /* ---------- Réveillon: sequência entre as famílias ----------
@@ -190,10 +236,10 @@ const publicAccount = (a: Account | null, role: Role) =>
 async function currentAccount(req: Request) {
   const auth = req.headers.get("authorization") || ""
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : ""
-  const p = token ? verify(token) : null
-  if (!p || (p.r !== "admin" && p.r !== "editor")) return null
+  const p = token && token.length < 1000 ? verify(token) : null
+  if (!p || (p.r !== "admin" && p.r !== "editor") || typeof p.h !== "string") return null
   const acc = await getAccount(p.r)
-  return acc && acc.hash.slice(0, 16) === p.h ? acc : null
+  return acc && safeEqual(fingerprint(acc), p.h) ? acc : null
 }
 
 const nightsBetween = (a: string, b: string) =>
@@ -323,33 +369,67 @@ async function validateBooking(input: any, cfg: AppConfig, ignoreId: string | un
 }
 
 /* ---------- rotas ---------- */
-export default async (req: Request, _context: Context) => {
+export default async (req: Request, context: Context) => {
   try {
     const url = new URL(req.url)
-    const [resource, id, action] = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean)
     const method = req.method
-    const body = method === "GET" || method === "DELETE" ? {} : await req.json().catch(() => ({}))
+    if (!["GET", "POST", "PUT", "DELETE"].includes(method)) return fail("Método não permitido.", 405, { allow: "GET, POST, PUT, DELETE" })
+    const parts = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean)
+    if (parts.length > 3) return fail("Rota não encontrada", 404)
+    const [resource, id, action] = parts
+    // ids na URL viram nomes de arquivos no Blobs: só aceita o formato que o próprio sistema gera
+    if ((id && !ID_RE.test(id)) || (action && !ID_RE.test(action))) return fail("Rota não encontrada", 404)
+
+    let body: any = {}
+    if (method !== "GET" && method !== "DELETE") {
+      // pedidos que alteram dados só valem vindos do próprio site (proteção extra contra CSRF)
+      const origin = req.headers.get("origin")
+      if (origin && origin !== url.origin) return fail("Origem não permitida.", 403)
+      if (!(req.headers.get("content-type") || "").toLowerCase().startsWith("application/json")) return fail("Formato inválido.", 415)
+      if (Number(req.headers.get("content-length") || 0) > MAX_BODY) return fail("Pedido grande demais.", 413)
+      const text = await req.text()
+      if (text.length > MAX_BODY) return fail("Pedido grande demais.", 413)
+      try { body = text ? JSON.parse(text) : {} } catch { return fail("Formato inválido.") }
+      if (!body || typeof body !== "object" || Array.isArray(body)) return fail("Formato inválido.")
+    }
 
     /* ---------- login ---------- */
-    if (resource === "login" && method === "POST") {
-      const username = String(body.username || "").trim().toLowerCase()
-      const password = String(body.password || "")
+    if (resource === "login" && method === "POST" && !id) {
+      const username = String(body.username || "").trim().toLowerCase().slice(0, 60)
+      const password = String(body.password || "").slice(0, 200)
+      if (!username || !password) return fail("Informe usuário e senha.", 400)
+
+      // freio contra robôs: muitas tentativas erradas bloqueiam por 15 minutos
+      const ipKey = attemptKey("ip", context.ip || req.headers.get("x-nf-client-connection-ip") || "desconhecido")
+      const userKey = attemptKey("user", username)
+      const [byIp, byUser] = await Promise.all([readAttempts(ipKey), readAttempts(userKey)])
+      if (byIp.n >= MAX_FAIL_IP || byUser.n >= MAX_FAIL_USER) {
+        const m = minutesLeft(byIp.n >= MAX_FAIL_IP ? byIp : byUser)
+        return fail(`Muitas tentativas erradas. Espere ${m} ${m === 1 ? "minuto" : "minutos"} e tente de novo.`, 429, { "retry-after": String(m * 60) })
+      }
+
+      let ok: Account | null = null
       for (const role of ["admin", "editor"] as Role[]) {
         let acc = await getAccount(role)
         // primeiro acesso: usa a senha definida nas variáveis do Netlify
         if (!acc && username === SEED[role].username) {
           const envPass = Netlify.env.get(SEED[role].env)
-          if (envPass && password === envPass) {
+          if (envPass && safeEqual(password, envPass)) {
             acc = { role, username: SEED[role].username, name: SEED[role].name, ...hashPassword(password), updatedAt: now() }
             await store().setJSON(`accounts/${role}`, acc, { onlyIfNew: true })
             acc = await getAccount(role)
           }
         }
-        if (acc && acc.username === username && checkPassword(password, acc)) {
-          return json({ token: tokenFor(acc), me: { role, username: acc.username, name: acc.name } })
-        }
+        // roda o scrypt sempre (com um hash fictício quando o usuário não bate), para o tempo não denunciar nada
+        const target = acc && acc.username === username ? acc : DUMMY
+        if (checkPassword(password, target) && target !== DUMMY) ok = target
       }
-      await new Promise((r) => setTimeout(r, 600)) // freia tentativas em série
+      if (ok) {
+        await store().delete(ipKey).catch(() => {})
+        return json({ token: tokenFor(ok), me: { role: ok.role, username: ok.username, name: ok.name } })
+      }
+      await Promise.all([addAttempt(ipKey), addAttempt(userKey)])
+      await new Promise((r) => setTimeout(r, 400 + Math.floor(Math.random() * 400))) // freia tentativas em série
       return fail("Usuário ou senha incorretos.", 401)
     }
 
@@ -376,9 +456,14 @@ export default async (req: Request, _context: Context) => {
     if (!me) return fail("Entre com seu login para fazer alterações.", 401)
 
     if (resource === "me" && id === "password" && method === "POST") {
-      if (!checkPassword(String(body.current || ""), me)) return fail("Senha atual incorreta.")
+      // a troca de senha também conta como tentativa: um token roubado não serve para adivinhar a senha
+      const curKey = attemptKey("pw", me.role)
+      const tries = await readAttempts(curKey)
+      if (tries.n >= MAX_FAIL_IP) return fail(`Muitas tentativas erradas. Espere ${minutesLeft(tries)} minutos.`, 429)
+      if (!checkPassword(String(body.current || ""), me)) { await addAttempt(curKey); return fail("Senha atual incorreta.") }
       const np = String(body.next || "")
-      if (np.length < 6) return fail("A nova senha precisa ter pelo menos 6 caracteres.")
+      if (np.length < MIN_PASSWORD) return fail(`A nova senha precisa ter pelo menos ${MIN_PASSWORD} caracteres.`)
+      if (np.length > 200) return fail("Senha longa demais (máx. 200 caracteres).")
       const upd = { ...me, ...hashPassword(np), updatedAt: now() }
       await store().setJSON(`accounts/${me.role}`, upd)
       return json({ token: tokenFor(upd) })
@@ -589,8 +674,16 @@ export default async (req: Request, _context: Context) => {
       if ((otherAcc?.username ?? SEED[other].username) === username) return fail("Esse usuário já é usado pelo outro login.")
       const name = String(body.name ?? current?.name ?? SEED[role].name).trim().slice(0, 60) || SEED[role].name
       const pw = String(body.password || "")
-      if (!current && pw.length < 6) return fail("Defina uma senha (mín. 6 caracteres) para ativar o editor.")
-      if (pw && pw.length < 6) return fail("Senha precisa ter pelo menos 6 caracteres.")
+      if (!current && pw.length < MIN_PASSWORD) return fail(`Defina uma senha (mín. ${MIN_PASSWORD} caracteres) para ativar o editor.`)
+      if (pw && pw.length < MIN_PASSWORD) return fail(`Senha precisa ter pelo menos ${MIN_PASSWORD} caracteres.`)
+      if (pw.length > 200) return fail("Senha longa demais (máx. 200 caracteres).")
+      // mudar o login do administrador (usuário ou senha) pede a senha atual: um token roubado não basta
+      if (role === "admin" && (pw || username !== me.username)) {
+        const curKey = attemptKey("pw", "admin")
+        const tries = await readAttempts(curKey)
+        if (tries.n >= MAX_FAIL_IP) return fail(`Muitas tentativas erradas. Espere ${minutesLeft(tries)} minutos.`, 429)
+        if (!checkPassword(String(body.current || ""), me)) { await addAttempt(curKey); return fail("Para mudar o usuário ou a senha do administrador, informe a senha atual.") }
+      }
       const upd: Account = { role, username, name, ...(pw ? hashPassword(pw) : { salt: current!.salt, hash: current!.hash }), updatedAt: now() }
       await store().setJSON(`accounts/${role}`, upd)
       return json({ account: publicAccount(upd, role), token: role === "admin" ? tokenFor(upd) : undefined })
@@ -598,9 +691,16 @@ export default async (req: Request, _context: Context) => {
 
     return fail("Rota não encontrada", 404)
   } catch (err: any) {
+    // detalhes do erro ficam só no log do Netlify; quem chamou não vê nada interno
     console.error(err)
-    return fail("Erro no servidor: " + (err?.message || "desconhecido"), 500)
+    return fail("Erro no servidor. Tente de novo em instantes.", 500)
   }
 }
 
-export const config: Config = { path: "/api/*" }
+export const config: Config = {
+  path: "/api/*",
+  /* Limite de requisições por IP (feito pelo próprio Netlify, antes de a função rodar):
+     até 90 pedidos por minuto; acima disso o Netlify responde 429 sem gastar a função.
+     O site normal faz 1 pedido por minuto (atualização) + os cliques, bem abaixo disso. */
+  rateLimit: { windowLimit: 90, windowSize: 60, aggregateBy: ["ip", "domain"], action: "rate_limit" },
+}
