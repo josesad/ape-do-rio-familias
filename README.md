@@ -49,6 +49,13 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 
 O nome, o usuário e a senha dos dois logins podem ser trocados na aba ⚙️ Admin.
 
+## Segurança
+- **Login protegido contra robôs:** 8 senhas erradas do mesmo IP bloqueiam aquele IP por 15 min; 25 erradas para o mesmo usuário (de qualquer lugar) bloqueiam o login desse usuário por 15 min. O IP não é guardado, só um código (HMAC) dele.
+- **Limite de requisições:** o Netlify corta acima de 90 pedidos por minuto por IP na API (resposta 429), antes de a função rodar.
+- Senhas com no mínimo 8 caracteres, guardadas com scrypt + sal. Login expira em 30 dias e cai ao trocar a senha ou o usuário.
+- Mudar o usuário ou a senha do admin pede a senha atual (um login roubado não basta).
+- Cabeçalhos de segurança (CSP, HSTS, anti-iframe, nosniff, Permissions-Policy) no site e na API; erros não mostram detalhes internos.
+
 ## Tecnologia
 - `public/index.html` — interface (HTML + JS puro, mobile-first)
 - `netlify/functions/api.mts` — API (login, reservas, pagamentos, usuários)

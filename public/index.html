@@ -427,11 +427,6 @@ input[type=date]{min-width:0}
   <button class="fab hidden" id="fab"></button>
 </div>
 
-<script>
-/* Sem zoom: bloqueia pinça no iPhone (toque duplo já é bloqueado pelo touch-action no CSS) */
-["gesturestart","gesturechange","gestureend"].forEach(function(t){document.addEventListener(t,function(e){e.preventDefault()},{passive:false})});
-document.addEventListener("touchmove",function(e){if(e.touches.length>1)e.preventDefault()},{passive:false});
-</script>
 <script src="/app.js"></script>
 </body>
 </html>
