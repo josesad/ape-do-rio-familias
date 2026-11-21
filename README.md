@@ -40,7 +40,7 @@ Sistema de agendamento do apartamento no Rio para as famílias (Maria José, Ân
 - Ordem e ano de referência editáveis em Ajustes → Sequência do Réveillon.
 
 ## Acessos
-🌐 **Link público:** qualquer pessoa com o link vê painel, calendário e reservas, sem login. Valores, diária e pagamentos (aba Financeiro) só aparecem para admin e editor — o servidor nem envia esses dados para quem não está logado.
+🌐 **Link público:** qualquer pessoa com o link vê painel, calendário, reservas, despesas e o Financeiro (valores, diária, saldo e pagamentos), sem login, só para consulta. Alterar qualquer coisa exige login. As observações dos pagamentos e os dados dos logins não são enviados para quem não está logado.
 
 | Login | Pode |
 |---|---|
